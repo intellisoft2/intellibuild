@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.6 — Materials & Labor price book, Permits/Safety/Quality, Plans & Documents, key tests */
+/* IntelliBuild AI™ v3.2.7 — Materials & Labor price book, Permits/Safety/Quality, Plans & Documents, key tests */
 'use strict';
 
 /* ================================================================== price book */
@@ -322,5 +322,29 @@ function renderKeyPanel(k) {
     catch (e) { out.innerHTML = '<span class="badge bad">✗ Error</span> ' + esc(e.message); } finally { busy(b, false); }
   });
 }
+
+/* ================================================================== activity log drawer */
+function logText(rows) {
+  return ['IntelliBuild AI v' + VERSION + ' activity log · exported ' + new Date().toISOString(), 'Browser: ' + navigator.userAgent, 'User: ' + (S.user ? S.user.email : S.guest ? 'guest' : 'signed out') + ' · Project: ' + (S.project ? S.project.name + ' (' + S.pid + ')' : 'none'), '']
+    .concat(rows.map(e => e.t.replace('T', ' ').slice(0, 19) + '  ' + e.level.toUpperCase().padEnd(5) + ' ' + e.area.padEnd(9) + ' ' + e.msg + (e.detail ? '\n                                   ' + e.detail : ''))).join('\n');
+}
+function logRows() {
+  const f = $('logFilter').value;
+  return IBLOG.items.filter(e => !f || (f === 'problems' ? e.level !== 'info' : e.area === f));
+}
+function renderLog() {
+  const rows = logRows().slice().reverse();
+  $('logList').innerHTML = rows.length ? rows.map(e => `<div class="lg ${e.level}"><span class="lg-t">${esc(new Date(e.t).toLocaleTimeString())}</span><span class="lg-a">${esc(e.area)}</span><div class="lg-m">${esc(e.msg)}${e.detail ? `<code>${esc(e.detail)}</code>` : ''}</div></div>`).join('') : '<p class="small" style="padding:16px">No events yet.</p>';
+}
+function renderLogBadge() { const b = $('logBadge'); if (!b) return; b.textContent = IBLOG.unseenErr; b.classList.toggle('hidden', !IBLOG.unseenErr); }
+function openLog(open) { const d = $('logDrawer'); d.classList.toggle('open', open); d.setAttribute('aria-hidden', open ? 'false' : 'true'); if (open) { IBLOG.unseenErr = 0; renderLogBadge(); renderLog(); } }
+$('logBtn').onclick = () => openLog(!$('logDrawer').classList.contains('open'));
+$('logClose').onclick = () => openLog(false);
+$('logFilter').onchange = renderLog;
+$('logCopy').onclick = () => navigator.clipboard.writeText(logText(logRows())).then(() => toast('Log copied — paste it into an email or chat to support.')).catch(() => toast('Copy failed — use Download instead.', { err: true }));
+$('logDl').onclick = () => downloadBlob('intellibuild-log-' + new Date().toISOString().slice(0, 16).replace(':', '') + '.txt', new Blob([logText(logRows())], { type: 'text/plain' }));
+$('logClear').onclick = () => { IBLOG.items = []; IBLOG.unseenErr = 0; try { localStorage.removeItem('ib_log'); } catch (e) { } renderLog(); renderLogBadge(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('logDrawer').classList.contains('open')) openLog(false); });
+ibLog('info', 'app', 'IntelliBuild v' + VERSION + ' loaded');
 
 wire(); renderStatic(); boot();

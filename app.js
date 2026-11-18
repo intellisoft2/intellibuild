@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.2.6 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.2.7 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.2.6';
+const VERSION = '3.2.7';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -22,6 +22,29 @@ const DEFAULTS = {
 const NUMERIC = new Set(['newBaths', 'area', 'stories', 'newBeds', 'garage', 'rate', 'demo', 'site', 'soft', 'cont', 'existingArea', 'yearBuilt', 'bedrooms', 'bathrooms', 'lotArea', 'compareRate', 'renoRate']);
 const ROLE_RANK = { viewer: 1, contractor: 2, editor: 3, owner: 4, admin: 5 };
 const PROJECT_TABS = new Set(['overview', 'property', 'intelligence', 'records', 'visualai', 'takeoffs', 'conceptlab', 'design', 'budget', 'materials', 'schedule', 'quality', 'feasibility', 'compare', 'bids', 'team', 'files', 'docs']);
+
+/* ------------------------------------------------------------------ activity log (kept in this browser, secrets removed) */
+const IBLOG = { max: 400, items: [], unseenErr: 0, st: null };
+try { IBLOG.items = JSON.parse(localStorage.getItem('ib_log') || '[]'); } catch (e) { IBLOG.items = []; }
+const LOG_SECRET = /token|password|b64|secret|apikey|api_key|key$/i;
+function scrub(o, depth = 0) {
+  if (!o || typeof o !== 'object') return typeof o === 'string' && o.length > 240 ? o.slice(0, 240) + '…' : o;
+  if (Array.isArray(o)) return o.length > 8 ? '[' + o.length + ' items]' : o.map(x => scrub(x, depth + 1));
+  const out = {};
+  for (const k of Object.keys(o)) { const v = o[k]; out[k] = LOG_SECRET.test(k) ? (v ? '[hidden]' : v) : (k === 'data' && depth === 0 && v && typeof v === 'object') ? '{project data}' : depth > 2 ? '…' : scrub(v, depth + 1); }
+  return out;
+}
+function ibLog(level, area, msg, detail) {
+  const e = { t: new Date().toISOString(), level, area, msg: String(msg).slice(0, 500) };
+  if (detail !== undefined) { try { e.detail = JSON.stringify(scrub(detail)).slice(0, 700); } catch (er) { } }
+  IBLOG.items.push(e); if (IBLOG.items.length > IBLOG.max) IBLOG.items.splice(0, IBLOG.items.length - IBLOG.max);
+  if (level === 'error') IBLOG.unseenErr++;
+  clearTimeout(IBLOG.st); IBLOG.st = setTimeout(() => { try { localStorage.setItem('ib_log', JSON.stringify(IBLOG.items)); } catch (er) { } }, 400);
+  if (window.renderLogBadge) renderLogBadge();
+  const d = document.getElementById('logDrawer'); if (d && d.classList.contains('open') && window.renderLog) renderLog();
+}
+window.addEventListener('error', e => ibLog('error', 'app', 'Script error: ' + e.message, { file: (e.filename || '').split('/').pop(), line: e.lineno }));
+window.addEventListener('unhandledrejection', e => ibLog('error', 'app', 'Unhandled: ' + ((e.reason && e.reason.message) || e.reason)));
 
 /* ------------------------------------------------------------------ global loading indicator (top bar + status pill) */
 const LOAD_LABELS = {
@@ -58,8 +81,11 @@ function loadEnd(label) {
   window.fetch = function (input, init) {
     const url = String((input && input.url) || input);
     const label = (init && init.ibLabel) || (/arcgis|fairfaxcounty/.test(url) ? 'Querying Fairfax County records…' : /census/.test(url) ? 'Locating the address…' : /overpass/.test(url) ? 'Finding nearby buildings…' : 'Loading…');
-    const t = loadStart(label);
-    return raw(input, init).finally(() => loadEnd(t));
+    const t = loadStart(label), t0 = performance.now(), isApi = CFG.api && url.indexOf(CFG.api) === 0;
+    const p = raw(input, init);
+    if (!isApi && !/version\.json/.test(url)) p.then(r => ibLog(r.ok ? 'info' : 'warn', 'ext', (init && init.method || 'GET') + ' ' + url.replace(/^https?:\/\//, '').split('?')[0].slice(0, 90) + ' → HTTP ' + r.status + ' (' + Math.round(performance.now() - t0) + ' ms)'),
+      e => ibLog('warn', 'ext', 'Direct request blocked or unreachable: ' + url.replace(/^https?:\/\//, '').split('/')[0] + ' — retrying through the IntelliBuild server', { error: String(e && e.message || e) }));
+    return p.finally(() => loadEnd(t));
   };
 })();
 
@@ -75,15 +101,18 @@ const P = () => S.P;
 /* ------------------------------------------------------------------ API, toasts, modal */
 async function api(action, payload = {}, label) {
   if (!CFG.api) throw Object.assign(new Error('The IntelliBuild service is not configured yet.'), { code: 'config' });
-  let r;
+  let r; const t0 = performance.now();
   try { r = await fetch(CFG.api, { method: 'POST', ibLabel: label || LOAD_LABELS[action] || (action.startsWith('admin.') ? 'Loading admin data…' : 'Working…'), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, token: S.token }, payload)) }); }
-  catch (e) { throw new Error('Cannot reach the IntelliBuild service. Check your connection and try again.'); }
-  let j; try { j = await r.json(); } catch (e) { throw new Error('The service returned an unexpected response. Please try again.'); }
+  catch (e) { ibLog('error', 'api', action + ' ✗ network error — service unreachable', { error: String(e.message || e) }); throw new Error('Cannot reach the IntelliBuild service. Check your connection and try again.'); }
+  let j; try { j = await r.json(); } catch (e) { ibLog('error', 'api', action + ' ✗ invalid response (HTTP ' + r.status + ')'); throw new Error('The service returned an unexpected response. Please try again.'); }
+  const ms = Math.round(performance.now() - t0);
   if (!j.ok) {
+    ibLog(['auth', 'upgrade', 'credits'].includes(j.code) ? 'warn' : 'error', 'api', action + ' ✗ ' + (j.error || 'failed') + ' (' + ms + ' ms)', Object.assign({ code: j.code }, payload));
     const e = new Error(j.error || 'Request failed'); e.code = j.code;
     if (j.code === 'auth' && S.token && !['login', 'signup'].includes(action)) { signOutLocal(); toast(j.error, { err: true }); }
     throw e;
   }
+  ibLog('info', 'api', action + ' ✓ ' + ms + ' ms', payload);
   return j.data;
 }
 function toast(msg, o = {}) {
@@ -94,6 +123,7 @@ function toast(msg, o = {}) {
 }
 function fail(e) {
   if (!e) return;
+  if (!e.code || e.code === 'error') ibLog('error', 'ui', 'Shown to user: ' + (e.message || e));
   if (e.code === 'upgrade') return toast(e.message, { err: true, action: 'See plans', onAction: () => tab('billing') });
   if (e.code === 'credits') return toast(e.message, { err: true, action: 'Buy credits', onAction: () => tab('billing') });
   if (e.code === 'auth') return;
@@ -223,6 +253,7 @@ function tab(name) {
   if (PROJECT_TABS.has(name) && !S.pid) name = 'projects';
   if (name === 'admin' && !(S.user && S.user.isAdmin)) name = 'projects';
   if (S.guest && ['billing', 'account', 'admin'].includes(name)) name = 'projects';
+  if (S.current !== name) ibLog('info', 'nav', 'Opened ' + name);
   S.current = name;
   qa('.tab').forEach(x => x.classList.toggle('active', x.id === name));
   qa('.nav').forEach(x => x.classList.toggle('active', x.dataset.tab === name));
@@ -434,7 +465,8 @@ async function uploadFiles(files) {
       if (/^image/.test(f.type) && f.size > 2.5e6) { const r = await resizeImage(f, 2400); b64 = r.b64; mime = r.mime; }
       else { if (f.size > 10e6) throw new Error(f.name + ' exceeds 10 MB'); b64 = (await readDataURL(f)).split(',')[1]; }
       await api('files.upload', { projectId: S.pid, name: f.name, mime, b64, kind }, 'Uploading ' + (files.length > 1 ? i + ' of ' + files.length + ': ' : '') + f.name + '…'); n++;
-    } catch (e) { fail(e); }
+      ibLog('info', 'upload', 'Uploaded ' + f.name + ' (' + kind + ', ' + Math.round(f.size / 1024) + ' KB)');
+    } catch (e) { ibLog('error', 'upload', 'Upload failed: ' + f.name + ' — ' + e.message); fail(e); }
   }
   $('uploadStatus').textContent = n + ' file(s) uploaded and saved to the project.'; $('uploads').value = '';
   await loadFiles();

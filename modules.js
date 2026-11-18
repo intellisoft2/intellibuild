@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.6 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.2.7 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
@@ -120,22 +120,28 @@ async function findParcel(p) {
   const a = parseAddress(p.matched || p.address);
   if (a) {
     const esc1 = v => String(v).replace(/'/g, "''");
+    ibLog('info', 'county', 'Searching county address points for number ' + a.num + ', street "' + a.street + '"' + (a.zip ? ', ZIP ' + a.zip : ''));
     let rows = await arcQuery(COUNTY_ADDR, { where: `FullStreetNumber='${esc1(a.num)}'` + (a.zip ? ` AND Zip='${esc1(a.zip)}'` : ''), outFields: 'PIN,FullAddress,StreetName,Zip,City', returnGeometry: 'true', outSR: 4326, resultRecordCount: 50 });
     const score = f => { const full = String(f.attributes.FullAddress || '').toUpperCase(); return a.words.filter(w => full.includes(w)).length; };
     let best = rows.filter(f => score(f) === a.words.length);
+    ibLog('info', 'county', rows.length + ' address point(s) with that number' + (a.zip ? ' and ZIP' : '') + ', ' + best.length + ' match the street name', rows.slice(0, 5).map(f => f.attributes.FullAddress + ' ' + f.attributes.Zip + ' → ' + f.attributes.PIN));
     if (!best.length && a.zip) { // ZIP from Census can differ from the county's; retry by number + street
       rows = await arcQuery(COUNTY_ADDR, { where: `FullStreetNumber='${esc1(a.num)}' AND UPPER(StreetName) LIKE '%${esc1(a.words[a.words.length - 1] || '')}%'`, outFields: 'PIN,FullAddress,StreetName,Zip,City', returnGeometry: 'true', outSR: 4326, resultRecordCount: 50 });
       best = rows.filter(f => score(f) === a.words.length);
+      ibLog('info', 'county', 'Retry without ZIP: ' + rows.length + ' candidate(s), ' + best.length + ' match');
     }
     const pins = [...new Set(best.map(f => f.attributes.PIN))];
     if (pins.length === 1) { const f = best[0]; return { pin: pins[0], method: 'address', label: 'Matched by street address (' + f.attributes.FullAddress + ', ' + f.attributes.City + ' ' + f.attributes.Zip + ')', centroid: ringCentroid(f.geometry), type: '' }; }
     if (pins.length > 1) return { multiple: pins, method: 'address' };
   }
+  if (a) ibLog('warn', 'county', 'No single address match — falling back to the map location');
   if (p.lat === null || p.lat === '') return null;
   const pt = JSON.stringify({ x: p.lon, y: p.lat, spatialReference: { wkid: 4326 } });
   let feats = await arcQuery(COUNTY_PARCELS, { geometry: pt, geometryType: 'esriGeometryPoint', inSR: 4326, spatialRel: 'esriSpatialRelIntersects', outFields: 'PIN,PARCEL_TYPE', returnGeometry: 'true', outSR: 4326 });
+  ibLog('info', 'county', 'Parcels containing the geocoded point: ' + feats.length);
   if (feats.length === 1) return { pin: feats[0].attributes.PIN, method: 'point', label: 'Geocoded point falls inside this parcel', centroid: ringCentroid(feats[0].geometry), type: feats[0].attributes.PARCEL_TYPE };
   feats = await arcQuery(COUNTY_PARCELS, { geometry: pt, geometryType: 'esriGeometryPoint', inSR: 4326, spatialRel: 'esriSpatialRelIntersects', distance: 200, units: 'esriSRUnit_Foot', outFields: 'PIN,PARCEL_TYPE', returnGeometry: 'true', outSR: 4326 });
+  ibLog('info', 'county', 'Parcels within 200 ft of the point: ' + feats.length);
   if (!feats.length) return null;
   const d = f => { const c = ringCentroid(f.geometry); return c ? Math.hypot((c.lat - p.lat) * 364000, (c.lon - p.lon) * 288000) : 1e9; };
   feats.sort((x, y) => d(x) - d(y));
@@ -148,18 +154,21 @@ async function lookupCounty() {
   const b = $('lookupCounty'); busy(b, true, 'Searching county records…'); st.textContent = 'Searching Fairfax County address points and parcels…';
   try {
     const hit = await findParcel(p);
-    if (!hit) { st.textContent = 'No Fairfax County parcel found for this address. It may be in an independent city (City of Fairfax, Falls Church, Alexandria) or a town with its own records — enter the PIN on Existing Property if you know it.'; return; }
+    if (!hit) { ibLog('warn', 'county', 'No parcel found for ' + (p.matched || p.address)); st.textContent = 'No Fairfax County parcel found for this address. It may be in an independent city (City of Fairfax, Falls Church, Alexandria) or a town with its own records — enter the PIN on Existing Property if you know it.'; return; }
     if (hit.multiple) { st.textContent = 'This address matches several parcels (e.g. units or condos): ' + hit.multiple.slice(0, 5).join(', ') + '. Enter the correct PIN on Existing Property.'; return; }
     const pin = hit.pin;
+    ibLog('info', 'county', 'Parcel selected: PIN ' + pin + ' (' + hit.method + ')', { label: hit.label });
     st.textContent = 'Parcel PIN ' + pin + ' found. Retrieving tax assessment tables…';
     const keys = ['parcel', 'dwelling', 'land', 'assessment'], settled = await Promise.allSettled(keys.map(k => countyTable(k, pin))), tables = {}, counts = {}, errors = [];
     keys.forEach((k, i) => { const rows = settled[i].status === 'fulfilled' ? settled[i].value : []; tables[k] = latest(rows); counts[k] = rows.length; if (settled[i].status === 'rejected') errors.push(k + ': ' + settled[i].reason.message); });
     p.county = { pin, parcelType: hit.type || (tables.parcel.LUC_DESC ? '' : ''), method: hit.method, methodLabel: hit.label, nearby: hit.others || [], matchedAddress: p.matched, retrievedAt: new Date().toISOString(), tables, counts, errors };
     if (hit.centroid && hit.method !== 'point') { p.lat = +hit.centroid.lat.toFixed(6); p.lon = +hit.centroid.lon.toFixed(6); p.geoSource = 'parcel'; }
+    ibLog(errors.length ? 'warn' : 'info', 'county', 'Tax tables — ' + keys.map(k => k + ': ' + counts[k]).join(', '), errors.length ? { errors } : undefined);
     const ap = applyCountyFields(false); p.countyApplied = true;
+    ibLog('info', 'county', 'Applied to project: ' + ap.filled + ' field(s) filled, ' + ap.conflicts.length + ' differ from owner entries', ap.conflicts.map(c => c.label + ': ' + c.mine + ' vs ' + c.county));
     st.textContent = '✓ ' + hit.label + '. ' + keys.filter(k => counts[k]).length + ' of 4 assessment tables matched · ' + ap.filled + ' field(s) filled automatically' + (ap.conflicts.length ? ' · ' + ap.conflicts.length + ' differ from your entries (review below)' : '') + '.' + (errors.length ? ' Some sources failed.' : '');
     renderCounty(); renderPropRecord(); if (window.renderJourney) renderJourney();
-  } catch (e) { st.textContent = 'County lookup unavailable: ' + e.message + '. No property values have been inferred.'; }
+  } catch (e) { ibLog('error', 'county', 'County lookup failed: ' + e.message); st.textContent = 'County lookup unavailable: ' + e.message + '. No property values have been inferred.'; }
   finally { busy(b, false); }
 }
 function countyLine(n, v, s) { return intelRow(n, pretty(v), s); }
@@ -580,8 +589,11 @@ async function adminDemo() {
 }
 async function adminAudit() {
   const d = await api('admin.audit');
+  const errOnly = adminCache.errOnly;
+  d.audit = errOnly ? d.audit.filter(a => /error/.test(a.action)) : d.audit;
   $('adminBody').innerHTML = `<div class="card"><h2>Exports (CSV)</h2><div class="flex">${['users', 'payments', 'aijobs', 'credits'].map(t => `<button class="btn sm secondary" data-exp="${t}">${t}</button>`).join('')}</div></div>
-  <div class="card section"><h2>Audit log (latest 300)</h2>${table(['When', 'Actor', 'Action', 'Detail'], d.audit.map(a => [when(a.at), esc(a.actor), esc(a.action), `<span class="small">${esc(String(a.detail).slice(0, 160))}</span>`]))}</div>`;
+  <div class="card section"><div class="flex between"><h2>Audit log (latest 300)</h2><label class="check"><input type="checkbox" id="auErr" ${errOnly ? 'checked' : ''}/> Server errors only</label></div>${table(['When', 'Actor', 'Action', 'Detail'], d.audit.map(a => [when(a.at), esc(a.actor), esc(a.action), `<span class="small">${esc(String(a.detail).slice(0, 160))}</span>`]))}</div>`;
+  $('auErr').onchange = () => { adminCache.errOnly = $('auErr').checked; adminAudit().catch(fail); };
   qa('[data-exp]').forEach(b => b.onclick = async () => { try { const r = await api('admin.export', { table: b.dataset.exp }); downloadBlob(r.filename, new Blob([r.csv], { type: 'text/csv;charset=utf-8' })); } catch (e) { fail(e); } });
 }
 

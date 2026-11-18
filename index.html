@@ -4,7 +4,7 @@
 <meta name="description" content="IntelliBuild AI: property intelligence, AI replacement-home concepts, smart takeoffs, cost estimating and contractor bidding in one workspace."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
-<link href="app.css?v=3.2.6" rel="stylesheet"/>
+<link href="app.css?v=3.2.7" rel="stylesheet"/>
 </head><body>
 <div id="boot" class="boot">Intelli<span>Build</span> AI™</div>
 
@@ -75,6 +75,7 @@
     <select id="projectSwitch" aria-label="Current project"></select>
     <span id="saveState" class="small"></span>
     <button class="chip" id="creditBadge" title="AI credits">✦ <b id="creditCount">0</b><span class="hide-sm"> credits</span></button>
+    <button class="chip logchip" id="logBtn" title="Activity log">📋 Log<b id="logBadge" class="hidden"></b></button>
     <button class="chip" id="userBtn"></button>
   </div>
 </header>
@@ -312,11 +313,15 @@
 
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="modal-card"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="flex mt end"><button class="btn secondary" id="modalCancel">Cancel</button><button class="btn" id="modalOk">OK</button></div></div></div>
 <div id="toasts" aria-live="polite"></div>
+<aside id="logDrawer" aria-label="Activity log" aria-hidden="true"><div class="dr-head"><div><b>Activity log</b><div class="small">What IntelliBuild did in this browser · last 400 events · secrets removed</div></div><button class="iconbtn show" id="logClose" aria-label="Close">✕</button></div>
+  <div class="dr-tools"><select id="logFilter" aria-label="Filter"><option value="">All events</option><option value="problems">Errors &amp; warnings</option><option value="api">Server calls</option><option value="county">County records</option><option value="autopilot">Autopilot</option><option value="upload">Uploads</option><option value="ext">External data services</option><option value="nav">Navigation</option></select>
+  <button class="btn sm secondary" id="logCopy">Copy</button><button class="btn sm secondary" id="logDl">Download</button><button class="btn sm secondary" id="logClear">Clear</button></div>
+  <div id="logList"></div></aside>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=3.2.6"></script>
-<script src="app.js?v=3.2.6"></script>
-<script src="pricing.js?v=3.2.6"></script>
-<script src="modules.js?v=3.2.6"></script>
-<script src="journey.js?v=3.2.6"></script>
-<script src="features.js?v=3.2.6"></script>
+<script src="config.js?v=3.2.7"></script>
+<script src="app.js?v=3.2.7"></script>
+<script src="pricing.js?v=3.2.7"></script>
+<script src="modules.js?v=3.2.7"></script>
+<script src="journey.js?v=3.2.7"></script>
+<script src="features.js?v=3.2.7"></script>
 </body></html>

@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.6 — guided project journey, Autopilot, and the narrated demo tour */
+/* IntelliBuild AI™ v3.2.7 — guided project journey, Autopilot, and the narrated demo tour */
 'use strict';
 
 /* ================================================================== journey */
@@ -87,7 +87,10 @@ async function autopilot() {
   const ov = document.createElement('div'); ov.className = 'modal'; ov.innerHTML = `<div class="modal-card ap"><h2>✨ Autopilot</h2><p class="small">Doing the busywork so you don't have to. You can change anything afterwards.</p><ol class="ap-steps">${steps.map(s => `<li id="ap_${s[0]}"><span class="ap-ico">○</span><span>${s[1]}</span><span class="small ap-note"></span></li>`).join('')}</ol><div class="flex end mt"><button class="btn hidden" id="apDone">See my next step →</button></div></div>`;
   document.body.append(ov);
   const mark = (id, state, note) => { const li = $('ap_' + id); li.className = state; li.querySelector('.ap-ico').textContent = { run: '◌', ok: '✓', skip: '–', err: '!' }[state]; li.querySelector('.ap-note').textContent = note || ''; };
-  const run = async (id, fn) => { mark(id, 'run'); try { const r = await fn(); mark(id, r && r.skip ? 'skip' : 'ok', r && r.note); } catch (e) { mark(id, 'err', e.message); } };
+  ibLog('info', 'autopilot', 'Autopilot started for ' + (addr || 'sample property'));
+  const run = async (id, fn) => { mark(id, 'run'); const label = (steps.find(x => x[0] === id) || [, id])[1];
+    try { const r = await fn(); mark(id, r && r.skip ? 'skip' : 'ok', r && r.note); ibLog(r && r.skip ? 'warn' : 'info', 'autopilot', label + (r && r.skip ? ' — skipped' : ' ✓') + (r && r.note ? ': ' + r.note : '')); }
+    catch (e) { mark(id, 'err', e.message); ibLog('error', 'autopilot', label + ' ✗ ' + e.message); } };
   await run('locate', async () => {
     if (S.P.sample) return { skip: 1, note: 'Sample property' };
     if (S.P.matched) return { note: S.P.matched };
