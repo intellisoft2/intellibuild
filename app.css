@@ -129,3 +129,15 @@ body.touring .content{padding-bottom:240px}
 .how{max-width:1200px;margin:auto;padding:10px 4% 30px}.how-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.how-n{display:inline-flex;width:30px;height:30px;border-radius:9px;background:#214b50;color:#80ffe1;align-items:center;justify-content:center;font-weight:800;margin-bottom:8px}
 @media(max-width:1100px){.jr-steps{grid-template-columns:repeat(5,minmax(0,1fr));row-gap:12px}.jr-steps li:nth-child(5)::after{display:none}.how-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.jr-steps{grid-template-columns:repeat(3,minmax(0,1fr))}.jr-steps li::after{display:none}.jr-lbl{font-size:10.5px}.how-grid{grid-template-columns:1fr}#tourBox p{font-size:14px}}
+
+/* v3.2.2 loading indicators */
+#loadbar{position:fixed;top:0;left:0;right:0;height:4px;z-index:300;pointer-events:none;opacity:0;transition:opacity .25s}
+#loadbar.on{opacity:1}#loadbar .lb-fill{height:100%;width:40%;background:linear-gradient(90deg,transparent,var(--teal),#9ff5e4,var(--teal),transparent);animation:lbmove 1.1s ease-in-out infinite}
+#loadbar.done .lb-fill{width:100%;animation:none;background:var(--teal);transition:width .25s}
+@keyframes lbmove{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+#loadpill{position:fixed;left:18px;bottom:18px;z-index:300;display:flex;gap:9px;align-items:center;background:#0d1d31;border:1px solid #2e5a5a;color:#dbe8f7;border-radius:99px;padding:8px 14px 8px 10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.45);opacity:0;transform:translateY(10px);transition:.2s;pointer-events:none;max-width:calc(100% - 36px)}
+#loadpill.on{opacity:1;transform:none}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--teal);border-right-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex:none}
+.spin.sm{width:13px;height:13px;margin-right:8px;vertical-align:-2px;border-color:currentColor;border-right-color:transparent}
+.btn.is-busy{opacity:.85;cursor:progress}
+body.touring #loadpill{bottom:auto;top:80px}

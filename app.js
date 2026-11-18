@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.2.1 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.2.2 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.2.1';
+const VERSION = '3.2.2';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -23,6 +23,46 @@ const NUMERIC = new Set(['newBaths', 'area', 'stories', 'newBeds', 'garage', 'ra
 const ROLE_RANK = { viewer: 1, contractor: 2, editor: 3, owner: 4, admin: 5 };
 const PROJECT_TABS = new Set(['overview', 'property', 'intelligence', 'records', 'visualai', 'takeoffs', 'conceptlab', 'design', 'budget', 'materials', 'schedule', 'quality', 'feasibility', 'compare', 'bids', 'team', 'files', 'docs']);
 
+/* ------------------------------------------------------------------ global loading indicator (top bar + status pill) */
+const LOAD_LABELS = {
+  'projects.save': 'Saving…', 'projects.get': 'Opening project…', 'projects.list': 'Loading projects…', 'projects.create': 'Creating project…', 'demo.get': 'Loading sample project…',
+  'files.upload': 'Uploading file…', 'files.get': 'Loading image…', 'files.list': 'Loading files…', 'ai.render': 'Generating AI concept — this can take up to a minute…', 'ai.brief': 'Writing AI brief…',
+  'property.geocode': 'Locating the address…', 'property.footprints': 'Finding nearby buildings…', 'property.arcgis': 'Querying Fairfax County records…',
+  'billing.checkout': 'Opening secure checkout…', 'billing.confirm': 'Confirming payment…', 'billing.portal': 'Opening billing portal…', 'billing.history': 'Loading billing…',
+  'bids.list': 'Loading bids…', 'bids.submit': 'Submitting bid…', 'members.invite': 'Sending invitation…', 'admin.dashboard': 'Loading dashboard…', 'admin.keyTest': 'Testing key…',
+  'login': 'Signing in…', 'signup': 'Creating your account…'
+};
+const LOAD = { n: 0, labels: [], showT: null, hideT: null };
+(function buildLoader() {
+  const bar = document.createElement('div'); bar.id = 'loadbar'; bar.innerHTML = '<div class="lb-fill"></div>';
+  const pill = document.createElement('div'); pill.id = 'loadpill'; pill.setAttribute('role', 'status'); pill.setAttribute('aria-live', 'polite'); pill.innerHTML = '<span class="spin"></span><span id="loadtxt">Loading…</span>';
+  document.body.append(bar, pill);
+})();
+function loadRender() {
+  const bar = $('loadbar'), pill = $('loadpill');
+  if (LOAD.n > 0) { bar.className = 'on'; pill.className = 'on'; $('loadtxt').textContent = LOAD.labels[LOAD.labels.length - 1] || 'Working…'; }
+}
+function loadStart(label) {
+  LOAD.n++; LOAD.labels.push(label || 'Working…'); clearTimeout(LOAD.hideT);
+  if ($('loadbar').className === 'on') loadRender(); else { clearTimeout(LOAD.showT); LOAD.showT = setTimeout(loadRender, 150); }
+  return label;
+}
+function loadEnd(label) {
+  LOAD.n = Math.max(0, LOAD.n - 1); const i = LOAD.labels.lastIndexOf(label); if (i >= 0) LOAD.labels.splice(i, 1);
+  if (LOAD.n) return loadRender();
+  clearTimeout(LOAD.showT);
+  if ($('loadbar').className === 'on') { $('loadbar').className = 'on done'; LOAD.hideT = setTimeout(() => { $('loadbar').className = ''; $('loadpill').className = ''; }, 350); }
+}
+(function wrapFetch() {
+  const raw = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    const url = String((input && input.url) || input);
+    const label = (init && init.ibLabel) || (/arcgis|fairfaxcounty/.test(url) ? 'Querying Fairfax County records…' : /census/.test(url) ? 'Locating the address…' : /overpass/.test(url) ? 'Finding nearby buildings…' : 'Loading…');
+    const t = loadStart(label);
+    return raw(input, init).finally(() => loadEnd(t));
+  };
+})();
+
 const S = {
   token: localStorage.getItem('ib_token') || '', user: null, ent: null, plansCfg: null, projects: [], demo: null, invites: [],
   pid: null, project: null, P: clone(DEFAULTS), canEdit: false, role: null, members: [], collabLimit: 0, updatedAt: '',
@@ -36,7 +76,7 @@ const P = () => S.P;
 async function api(action, payload = {}) {
   if (!CFG.api) throw Object.assign(new Error('The IntelliBuild service is not configured yet.'), { code: 'config' });
   let r;
-  try { r = await fetch(CFG.api, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, token: S.token }, payload)) }); }
+  try { r = await fetch(CFG.api, { method: 'POST', ibLabel: LOAD_LABELS[action] || (action.startsWith('admin.') ? 'Loading admin data…' : 'Working…'), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, token: S.token }, payload)) }); }
   catch (e) { throw new Error('Cannot reach the IntelliBuild service. Check your connection and try again.'); }
   let j; try { j = await r.json(); } catch (e) { throw new Error('The service returned an unexpected response. Please try again.'); }
   if (!j.ok) {
@@ -68,7 +108,7 @@ function modal(title, html, okText = 'OK') {
     $('modalOk').onclick = () => { const v = {}; qa('[name]', $('modalBody')).forEach(el => v[el.name] = el.type === 'checkbox' ? el.checked : el.value); close(v); };
   });
 }
-function busy(btn, on, label) { if (!btn) return; if (on) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.textContent = label || 'Working…'; } else { btn.disabled = false; if (btn.dataset.label) btn.innerHTML = btn.dataset.label; } }
+function busy(btn, on, label) { if (!btn) return; if (on) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.classList.add('is-busy'); btn.innerHTML = '<span class="spin sm"></span>' + esc(label || 'Working…'); } else { btn.disabled = false; btn.classList.remove('is-busy'); if (btn.dataset.label) btn.innerHTML = btn.dataset.label; } }
 function downloadBlob(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1500); }
 function downloadJSON(name, data) { downloadBlob(name, new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); }
 function readDataURL(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Could not read file')); r.readAsDataURL(file); }); }
