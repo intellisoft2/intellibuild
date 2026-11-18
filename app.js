@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.2.2 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.2.3 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.2.2';
+const VERSION = '3.2.3';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -124,8 +124,23 @@ const creditCost = k => (S.plansCfg && S.plansCfg.creditCosts && S.plansCfg.cred
 
 /* ------------------------------------------------------------------ boot & routing */
 function hashParams() { const h = location.hash.replace(/^#/, ''); const o = {}; h.split('&').forEach(kv => { const [k, v] = kv.split('='); if (k) o[k] = v === undefined ? true : decodeURIComponent(v); }); return o; }
+/** Reloads once if a newer build is published (version.json is written by deploy.sh and never cached). */
+async function checkForUpdate() {
+  try {
+    const r = await fetch('version.json?ts=' + Date.now(), { cache: 'no-store', ibLabel: 'Checking for updates…' });
+    if (!r.ok) return false;
+    const v = (await r.json()).version;
+    if (v && v !== VERSION && sessionStorage.getItem('ib_reloaded_for') !== v) {
+      sessionStorage.setItem('ib_reloaded_for', v);
+      location.replace(location.pathname + '?v=' + encodeURIComponent(v) + location.hash);
+      return true;
+    }
+  } catch (e) { }
+  return false;
+}
 async function boot() {
   qa('.ver').forEach(e => e.textContent = VERSION);
+  if (await checkForUpdate()) return;
   const hp = hashParams(), qp = new URLSearchParams(location.search);
   api('billing.plans').then(d => { S.plansCfg = d; renderPublicPlans(); refreshCreditCostLabels(); }).catch(() => {});
   if (hp.verify) { try { await api('verifyEmail', { verifyToken: hp.verify }); toast('Email verified. Thank you!'); } catch (e) { fail(e); } history.replaceState(null, '', location.pathname); }

@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.2 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.2.3 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
