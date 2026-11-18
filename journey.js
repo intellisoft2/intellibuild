@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.0 — guided project journey, Autopilot, and the narrated demo tour */
+/* IntelliBuild AI™ v3.2.1 — guided project journey, Autopilot, and the narrated demo tour */
 'use strict';
 
 /* ================================================================== journey */

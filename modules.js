@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.0 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.2.1 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
@@ -94,22 +94,63 @@ function pinVariants(pin) { const p = String(pin || '').trim(); const a = [p, p.
 async function countyTable(name, pin) { for (const v of pinVariants(pin)) { const f = await arcQuery(COUNTY_TABLES[name], { where: "PARID='" + v.replace(/'/g, "''") + "'", outFields: '*', returnGeometry: 'false', resultRecordCount: 25 }); if (f.length) return f.map(x => x.attributes); } return []; }
 const latest = rows => [...rows].sort((a, b) => Number(b.TAXYR || 0) - Number(a.TAXYR || 0))[0] || {};
 const firstValue = (o, keys) => { for (const k of keys) if (o[k] !== null && o[k] !== undefined && o[k] !== '') return o[k]; return null; };
+const COUNTY_ADDR = 'https://services1.arcgis.com/ioennV6PpG5Xodq0/ArcGIS/rest/services/Parcel_Address_Validator/FeatureServer/0';
+const STREET_TYPES = /\s+(RD|ROAD|ST|STREET|DR|DRIVE|CT|COURT|LN|LANE|AVE|AV|AVENUE|WAY|PL|PLACE|CIR|CIRCLE|TER|TERR|TERRACE|BLVD|PKWY|HWY|TRL|TRAIL|SQ|LOOP|RUN|PIKE|XING|GLN|GLEN|CV|COVE|ROW|WALK|PATH|PT|POINT|CRES|CRESCENT|LNDG|LANDING)$/;
+/** "1234 N PALMER GLEN CT, OAKTON, VA, 22124" → { num, words, zip } */
+function parseAddress(s) {
+  const u = String(s || '').toUpperCase().replace(/\./g, ''), m = u.match(/^\s*(\d+[A-Z]?)\s+([^,]+)/);
+  if (!m) return null;
+  const z = u.match(/\b(\d{5})(?:-\d{4})?\s*$/);
+  const street = m[2].replace(STREET_TYPES, '').replace(/^(N|S|E|W|NORTH|SOUTH|EAST|WEST)\s+/, '').trim();
+  return { num: m[1], street, words: street.split(/\s+/).filter(w => w.length > 1), zip: z ? z[1] : '' };
+}
+function ringCentroid(geom) {
+  const pts = (geom && geom.rings ? geom.rings[0] : []) || []; if (!pts.length) return null;
+  const c = pts.reduce((a, p) => [a[0] + p[0], a[1] + p[1]], [0, 0]); return { lon: c[0] / pts.length, lat: c[1] / pts.length };
+}
+/** Finds the parcel: 1) county address points by street address, 2) nearest parcel within 200 ft, 3) exact point. */
+async function findParcel(p) {
+  const a = parseAddress(p.matched || p.address);
+  if (a) {
+    const esc1 = v => String(v).replace(/'/g, "''");
+    let rows = await arcQuery(COUNTY_ADDR, { where: `FullStreetNumber='${esc1(a.num)}'` + (a.zip ? ` AND Zip='${esc1(a.zip)}'` : ''), outFields: 'PIN,FullAddress,StreetName,Zip,City', returnGeometry: 'true', outSR: 4326, resultRecordCount: 50 });
+    const score = f => { const full = String(f.attributes.FullAddress || '').toUpperCase(); return a.words.filter(w => full.includes(w)).length; };
+    let best = rows.filter(f => score(f) === a.words.length);
+    if (!best.length && a.zip) { // ZIP from Census can differ from the county's; retry by number + street
+      rows = await arcQuery(COUNTY_ADDR, { where: `FullStreetNumber='${esc1(a.num)}' AND UPPER(StreetName) LIKE '%${esc1(a.words[a.words.length - 1] || '')}%'`, outFields: 'PIN,FullAddress,StreetName,Zip,City', returnGeometry: 'true', outSR: 4326, resultRecordCount: 50 });
+      best = rows.filter(f => score(f) === a.words.length);
+    }
+    const pins = [...new Set(best.map(f => f.attributes.PIN))];
+    if (pins.length === 1) { const f = best[0]; return { pin: pins[0], method: 'address', label: 'Matched by street address (' + f.attributes.FullAddress + ', ' + f.attributes.City + ' ' + f.attributes.Zip + ')', centroid: ringCentroid(f.geometry), type: '' }; }
+    if (pins.length > 1) return { multiple: pins, method: 'address' };
+  }
+  if (p.lat === null || p.lat === '') return null;
+  const pt = JSON.stringify({ x: p.lon, y: p.lat, spatialReference: { wkid: 4326 } });
+  let feats = await arcQuery(COUNTY_PARCELS, { geometry: pt, geometryType: 'esriGeometryPoint', inSR: 4326, spatialRel: 'esriSpatialRelIntersects', outFields: 'PIN,PARCEL_TYPE', returnGeometry: 'true', outSR: 4326 });
+  if (feats.length === 1) return { pin: feats[0].attributes.PIN, method: 'point', label: 'Geocoded point falls inside this parcel', centroid: ringCentroid(feats[0].geometry), type: feats[0].attributes.PARCEL_TYPE };
+  feats = await arcQuery(COUNTY_PARCELS, { geometry: pt, geometryType: 'esriGeometryPoint', inSR: 4326, spatialRel: 'esriSpatialRelIntersects', distance: 200, units: 'esriSRUnit_Foot', outFields: 'PIN,PARCEL_TYPE', returnGeometry: 'true', outSR: 4326 });
+  if (!feats.length) return null;
+  const d = f => { const c = ringCentroid(f.geometry); return c ? Math.hypot((c.lat - p.lat) * 364000, (c.lon - p.lon) * 288000) : 1e9; };
+  feats.sort((x, y) => d(x) - d(y));
+  return { pin: feats[0].attributes.PIN, method: 'nearest', label: 'Nearest parcel to the geocoded point (' + Math.round(d(feats[0])) + ' ft) — confirm this is your lot', centroid: ringCentroid(feats[0].geometry), type: feats[0].attributes.PARCEL_TYPE, others: feats.slice(1, 4).map(f => f.attributes.PIN) };
+}
 async function lookupCounty() {
   if (!requirePro('Fairfax official records')) return;
   const st = $('recordStatus'), p = S.P;
-  if (p.lat === null || p.lat === '') { st.textContent = 'First geocode a real address on the Overview tab.'; return; }
-  const b = $('lookupCounty'); busy(b, true, 'Querying county…'); st.textContent = 'Querying official parcel geometry at the geocoded location…';
+  if (!p.matched && !p.address) { st.textContent = 'Enter and locate the property address on the Overview tab first.'; return; }
+  const b = $('lookupCounty'); busy(b, true, 'Searching county records…'); st.textContent = 'Searching Fairfax County address points and parcels…';
   try {
-    const feats = await arcQuery(COUNTY_PARCELS, { geometry: JSON.stringify({ x: p.lon, y: p.lat, spatialReference: { wkid: 4326 } }), geometryType: 'esriGeometryPoint', inSR: 4326, spatialRel: 'esriSpatialRelIntersects', outFields: 'PIN,PARCEL_KEY,PARCEL_TYPE', returnGeometry: 'false' });
-    if (!feats.length) { st.textContent = 'No Fairfax parcel intersects this point. Verify the address is in Fairfax County.'; return; }
-    if (feats.length > 1) { st.textContent = 'Multiple parcels intersect the point — verify the PIN in county records; none was auto-selected.'; return; }
-    const pin = feats[0].attributes.PIN; if (!pin) throw Error('Parcel returned without a PIN');
+    const hit = await findParcel(p);
+    if (!hit) { st.textContent = 'No Fairfax County parcel found for this address. It may be in an independent city (City of Fairfax, Falls Church, Alexandria) or a town with its own records — enter the PIN on Existing Property if you know it.'; return; }
+    if (hit.multiple) { st.textContent = 'This address matches several parcels (e.g. units or condos): ' + hit.multiple.slice(0, 5).join(', ') + '. Enter the correct PIN on Existing Property.'; return; }
+    const pin = hit.pin;
     st.textContent = 'Parcel PIN ' + pin + ' found. Retrieving tax assessment tables…';
     const keys = ['parcel', 'dwelling', 'land', 'assessment'], settled = await Promise.allSettled(keys.map(k => countyTable(k, pin))), tables = {}, counts = {}, errors = [];
     keys.forEach((k, i) => { const rows = settled[i].status === 'fulfilled' ? settled[i].value : []; tables[k] = latest(rows); counts[k] = rows.length; if (settled[i].status === 'rejected') errors.push(k + ': ' + settled[i].reason.message); });
-    p.county = { pin, parcelType: feats[0].attributes.PARCEL_TYPE, matchedAddress: p.matched, retrievedAt: new Date().toISOString(), tables, counts, errors };
-    markDirty(); st.textContent = 'Official parcel lookup complete. ' + keys.filter(k => counts[k]).length + ' of 4 assessment tables matched.' + (errors.length ? ' Some sources failed.' : '');
-    renderCounty();
+    p.county = { pin, parcelType: hit.type || (tables.parcel.LUC_DESC ? '' : ''), method: hit.method, methodLabel: hit.label, nearby: hit.others || [], matchedAddress: p.matched, retrievedAt: new Date().toISOString(), tables, counts, errors };
+    if (hit.centroid && hit.method !== 'point') { p.lat = +hit.centroid.lat.toFixed(6); p.lon = +hit.centroid.lon.toFixed(6); p.geoSource = 'parcel'; }
+    markDirty(); st.textContent = '✓ ' + hit.label + '. ' + keys.filter(k => counts[k]).length + ' of 4 assessment tables matched.' + (errors.length ? ' Some sources failed.' : '');
+    renderCounty(); if (window.renderJourney) renderJourney();
   } catch (e) { st.textContent = 'County lookup unavailable: ' + e.message + '. No property values have been inferred.'; }
   finally { busy(b, false); }
 }
@@ -118,8 +159,8 @@ function renderCounty() {
   const c = S.P.county;
   if (!c) { $('countyParcel').innerHTML = '<p>No verified parcel loaded.</p>'; $('countyDwelling').innerHTML = '<p>No dwelling records loaded.</p>'; $('countyProvenance').textContent = premium() ? '' : 'Official records are included with Homeowner Pro or Builder Pro.'; return; }
   const p = c.tables.parcel || {}, d = c.tables.dwelling || {}, l = c.tables.land || {}, a = c.tables.assessment || {};
-  $('countyParcel').innerHTML = [countyLine('Parcel PIN', c.pin, 'Fairfax GIS parcel geometry'), countyLine('Parcel type', c.parcelType, 'County parcel layer'), countyLine('Zoning description', p.ZONING_DESC, 'County tax parcel table'), countyLine('Land use', p.LUC_DESC, 'County tax parcel table'), countyLine('Land size (sq ft)', l.SF, 'County land table')].join('');
-  $('countyDwelling').innerHTML = [countyLine('Year built', d.YRBLT, 'County dwelling table'), countyLine('Above-grade living area (sq ft)', d.SFLA, 'County dwelling table'), countyLine('Bedrooms', d.RMBED, 'County dwelling table'), countyLine('Full bathrooms', d.FIXBATH, 'County dwelling table'), countyLine('Half bathrooms', d.FIXHALF, 'County dwelling table'), countyLine('Style', d.STYLE_DESC, 'County dwelling table'), countyLine('Condition', d.CDU_DESC, 'County dwelling table'), countyLine('Current assessed value', firstValue(a, ['TOTAL', 'TOTAL_VALUE', 'TOTVAL', 'TOTALVAL', 'CURR_TOTAL', 'TOT_ASMT']), 'County assessment')].join('');
+  $('countyParcel').innerHTML = [countyLine('Parcel PIN', c.pin, c.methodLabel || 'Fairfax GIS parcel geometry'), countyLine('Parcel type', c.parcelType, 'County parcel layer'), countyLine('Zoning description', p.ZONING_DESC, 'County tax parcel table'), countyLine('Land use', p.LUC_DESC, 'County tax parcel table'), countyLine('Land size (sq ft)', l.SF, 'County land table')].join('');
+  $('countyDwelling').innerHTML = [countyLine('Year built', d.YRBLT, 'County dwelling table'), countyLine('Above-grade living area (sq ft)', d.SFLA, 'County dwelling table'), countyLine('Bedrooms', d.RMBED, 'County dwelling table'), countyLine('Full bathrooms', d.FIXBATH, 'County dwelling table'), countyLine('Half bathrooms', d.FIXHALF, 'County dwelling table'), countyLine('Style', d.STYLE_DESC, 'County dwelling table'), countyLine('Condition', d.CDU_DESC, 'County dwelling table'), countyLine('Current assessed value', (v => v === null ? null : isNaN(+v) ? v : fmt(+v))(firstValue(a, ['TOTAL', 'TOTAL_VALUE', 'TOTVAL', 'TOTALVAL', 'CURR_TOTAL', 'TOT_ASMT'])), 'County assessment' + (a.TAXYR ? ' · tax year ' + a.TAXYR : ''))].join('');
   $('countyProvenance').textContent = 'Retrieved ' + when(c.retrievedAt) + ' · PIN ' + c.pin + ' · record counts: ' + Object.entries(c.counts).map(([k, v]) => k + ' ' + v).join(', ') + '. ' + (c.errors.length ? 'Errors: ' + c.errors.join('; ') : 'No API errors.') + ' Source data may lag real-world changes.';
 }
 function applyCounty() {
