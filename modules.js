@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.8 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.2.9 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
@@ -39,17 +39,18 @@ function renderIntel() {
   }
 }
 /** OpenStreetMap building outlines within 100 m: server proxy first, then public Overpass mirrors directly from the browser. */
-async function getFootprints(lat, lon) {
+async function getFootprints(lat, lon, bg) {
+  const label = bg ? 'Mapping nearby buildings (background)…' : 'Finding nearby buildings…';
   const q = `[out:json][timeout:8];(way["building"](around:100,${lat},${lon}););out geom;`, t0 = Date.now();
   // Browser first (fast, CORS-enabled), each mirror capped at 6 s; then the server proxy once.
   for (const m of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 6000);
-    try { const r = await fetch(m, { method: 'POST', signal: ctl.signal, ibLabel: 'Finding nearby buildings…', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    try { const r = await fetch(m, { method: 'POST', signal: ctl.signal, ibLabel: label, body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
       if (r.ok) { clearTimeout(timer); return ((await r.json()).elements || []).filter(e => e.geometry && e.geometry.length > 2); } }
     catch (e) { ibLog('warn', 'ext', 'Building outlines: ' + m.split('/')[2] + (e.name === 'AbortError' ? ' timed out after 6 s' : ' unreachable')); }
     finally { clearTimeout(timer); }
   }
-  if (Date.now() - t0 < 15000) { try { return (await api('property.footprints', { lat, lon })).elements; } catch (e) { } }
+  if (Date.now() - t0 < 15000) { try { return (await api('property.footprints', { lat, lon }, label, { timeoutMs: 12000 })).elements; } catch (e) { } }
   throw new Error('the OpenStreetMap building service is busy right now');
 }
 async function findFootprints() {

@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.2.8 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.2.9 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.2.8';
+const VERSION = '3.2.9';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -99,12 +99,15 @@ function merged(data) { const p = Object.assign(clone(DEFAULTS), data || {}); p.
 const P = () => S.P;
 
 /* ------------------------------------------------------------------ API, toasts, modal */
-async function api(action, payload = {}, label) {
+async function api(action, payload = {}, label, opt = {}) {
   if (!CFG.api) throw Object.assign(new Error('The IntelliBuild service is not configured yet.'), { code: 'config' });
-  let r; const t0 = performance.now();
-  try { r = await fetch(CFG.api, { method: 'POST', ibLabel: label || LOAD_LABELS[action] || (action.startsWith('admin.') ? 'Loading admin data…' : 'Working…'), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, token: S.token }, payload)) }); }
-  catch (e) { ibLog('error', 'api', action + ' ✗ network error — service unreachable', { error: String(e.message || e) }); throw new Error('Cannot reach the IntelliBuild service. Check your connection and try again.'); }
-  let j; try { j = await r.json(); } catch (e) { ibLog('error', 'api', action + ' ✗ invalid response (HTTP ' + r.status + ')'); throw new Error('The service returned an unexpected response. Please try again.'); }
+  let r; const t0 = performance.now(), ctl = opt.timeoutMs ? new AbortController() : null, timer = ctl && setTimeout(() => ctl.abort(), opt.timeoutMs);
+  try { r = await fetch(CFG.api, { method: 'POST', signal: ctl ? ctl.signal : undefined, ibLabel: label || LOAD_LABELS[action] || (action.startsWith('admin.') ? 'Loading admin data…' : 'Working…'), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, token: S.token }, payload)) }); }
+  catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') { ibLog('warn', 'api', action + ' — gave up after ' + opt.timeoutMs / 1000 + ' s'); throw Object.assign(new Error('That took too long — please try again later.'), { code: 'timeout' }); }
+    ibLog('error', 'api', action + ' ✗ network error — service unreachable', { error: String(e.message || e) }); throw new Error('Cannot reach the IntelliBuild service. Check your connection and try again.'); }
+  let j; try { j = await r.json(); clearTimeout(timer); } catch (e) { ibLog('error', 'api', action + ' ✗ invalid response (HTTP ' + r.status + ')'); throw new Error('The service returned an unexpected response. Please try again.'); }
   const ms = Math.round(performance.now() - t0);
   if (!j.ok) {
     ibLog(['auth', 'upgrade', 'credits'].includes(j.code) ? 'warn' : 'error', 'api', action + ' ✗ ' + (j.error || 'failed') + ' (' + ms + ' ms)', Object.assign({ code: j.code }, payload));

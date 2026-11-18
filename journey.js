@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.8 — guided project journey, Autopilot, and the narrated demo tour */
+/* IntelliBuild AI™ v3.2.9 — guided project journey, Autopilot, and the narrated demo tour */
 'use strict';
 
 /* ================================================================== journey */
@@ -104,7 +104,8 @@ async function autopilot() {
     if (S.P.lat === null || S.P.lat === '') return { skip: 1, note: 'Needs a located address' };
     // Optional and slow at times: run it in the background so the remaining steps don't wait.
     const lat = S.P.lat, lon = S.P.lon, pid = S.pid;
-    getFootprints(lat, lon).then(els => { if (S.pid !== pid) return; S.P.intel = { buildingCount: els.length, lastChecked: new Date().toISOString() }; markDirty(); ibLog('info', 'autopilot', 'Nearby buildings mapped in background: ' + els.length); })
+    const ic = S.P.intel; if (ic && ic.lastChecked && Date.now() - new Date(ic.lastChecked) < 30 * 864e5) return { note: ic.buildingCount + ' mapped buildings (checked recently)' };
+    getFootprints(lat, lon, true).then(els => { if (S.pid !== pid) return; S.P.intel = { buildingCount: els.length, lastChecked: new Date().toISOString() }; markDirty(); ibLog('info', 'autopilot', 'Nearby buildings mapped in background: ' + els.length); })
       .catch(() => ibLog('warn', 'autopilot', 'Nearby buildings: map service busy — retry on Property Intelligence'));
     return { note: 'Running in the background — results appear on Property Intelligence' };
   });
