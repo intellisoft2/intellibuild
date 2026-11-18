@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.0.2 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.1.0 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.0.2';
+const VERSION = '3.1.0';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -16,11 +16,12 @@ const DEFAULTS = {
   rate: 275, demo: 35000, site: 50000, soft: 12, cont: 12, checks: {}, zone: '', constraints: '', source: 'owner',
   compareRate: 300, renoRate: 175, takeoff: { area: 4000, stories: 2, shape: 1.15, waste: 10, rates: {}, qty: {} },
   priorities: '', designConstraints: '', brief: '', aiStyle: 'modern farmhouse', aiFinish: 'Premium', aiNotes: '',
-  concept: { style: 'contemporary', opacity: 75, width: 62, height: 58 }, county: null, intel: { buildingCount: null, lastChecked: null }, privateNotes: ''
+  concept: { style: 'contemporary', opacity: 75, width: 62, height: 58 }, county: null, intel: { buildingCount: null, lastChecked: null }, privateNotes: '',
+  newBaths: 3.5, foundation: 'basement', finishTier: 'Premium', checklist: {}, mlOverrides: {}, planVariant: 0
 };
-const NUMERIC = new Set(['area', 'stories', 'newBeds', 'garage', 'rate', 'demo', 'site', 'soft', 'cont', 'existingArea', 'yearBuilt', 'bedrooms', 'bathrooms', 'lotArea', 'compareRate', 'renoRate']);
+const NUMERIC = new Set(['newBaths', 'area', 'stories', 'newBeds', 'garage', 'rate', 'demo', 'site', 'soft', 'cont', 'existingArea', 'yearBuilt', 'bedrooms', 'bathrooms', 'lotArea', 'compareRate', 'renoRate']);
 const ROLE_RANK = { viewer: 1, contractor: 2, editor: 3, owner: 4, admin: 5 };
-const PROJECT_TABS = new Set(['overview', 'property', 'intelligence', 'records', 'visualai', 'takeoffs', 'conceptlab', 'design', 'budget', 'materials', 'schedule', 'quality', 'feasibility', 'compare', 'bids', 'team', 'files']);
+const PROJECT_TABS = new Set(['overview', 'property', 'intelligence', 'records', 'visualai', 'takeoffs', 'conceptlab', 'design', 'budget', 'materials', 'schedule', 'quality', 'feasibility', 'compare', 'bids', 'team', 'files', 'docs']);
 
 const S = {
   token: localStorage.getItem('ib_token') || '', user: null, ent: null, plansCfg: null, projects: [], demo: null, invites: [],
@@ -28,7 +29,7 @@ const S = {
   files: [], fileCache: {}, guest: false, dirty: false, saving: false, current: 'projects', adminTab: 'overview', inviteToken: '', resetToken: ''
 };
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
-function merged(data) { const p = Object.assign(clone(DEFAULTS), data || {}); p.takeoff = Object.assign(clone(DEFAULTS.takeoff), (data || {}).takeoff || {}); p.concept = Object.assign(clone(DEFAULTS.concept), (data || {}).concept || {}); p.intel = Object.assign(clone(DEFAULTS.intel), (data || {}).intel || {}); p.checks = p.checks || {}; return p; }
+function merged(data) { const p = Object.assign(clone(DEFAULTS), data || {}); p.takeoff = Object.assign(clone(DEFAULTS.takeoff), (data || {}).takeoff || {}); p.concept = Object.assign(clone(DEFAULTS.concept), (data || {}).concept || {}); p.intel = Object.assign(clone(DEFAULTS.intel), (data || {}).intel || {}); p.checks = p.checks || {}; p.checklist = p.checklist || {}; p.mlOverrides = p.mlOverrides || {}; return p; }
 const P = () => S.P;
 
 /* ------------------------------------------------------------------ API, toasts, modal */
@@ -174,7 +175,7 @@ function tab(name) {
   $('menu').classList.remove('open');
   window.scrollTo({ top: 0, behavior: 'smooth' });
   const h = { projects: loadProjects, overview: renderOverview, property: renderProperty, intelligence: renderIntel, records: renderCounty, visualai: renderGallery, takeoffs: renderTake,
-    conceptlab: drawConcept, design: renderDesigns, budget: compute, materials: compute, schedule: () => {}, quality: renderChecklist, feasibility: renderFeas, compare: renderCompare,
+    conceptlab: drawConcept, design: renderDesigns, budget: compute, materials: renderMaterials, docs: renderDocs, schedule: () => {}, quality: renderChecklist, feasibility: renderFeas, compare: renderCompare,
     bids: loadBids, team: loadTeam, files: loadFiles, billing: loadBilling, account: fillAccount, admin: () => loadAdmin(S.adminTab) }[name];
   if (h) Promise.resolve(h()).catch(fail);
 }
@@ -273,6 +274,8 @@ function derive(k) {
   if (S.current === 'compare') renderCompare();
   if (S.current === 'intelligence') renderEvidence();
   if (S.current === 'property') renderPropRecord();
+  if (S.current === 'materials' && costbook()) drawMaterials();
+  if (S.current === 'docs' && k !== 'privateNotes') renderDocs();
 }
 
 /* save (debounced, optimistic concurrency) */
@@ -303,7 +306,7 @@ function renderOverview() {
   $('mProperty').textContent = p.sample ? 'Sample only' : located ? 'Located' : 'Not located';
   $('mArea').textContent = Number(p.area).toLocaleString() + ' sq ft';
   $('mBudget').textContent = fmt(p.budget);
-  const pct = Math.round(Object.values(p.checks).filter(Boolean).length / CHECKS.length * 100); $('mTasks').textContent = pct + '% complete';
+  const pct = checklistProgress().pct; $('mTasks').textContent = pct + '% complete';
   const rows = [['Address identified', located ? 'Located' : p.sample ? 'Sample' : 'Pending'], ['Existing home details', p.existingArea ? 'Entered' : 'Pending'],
     ['Official records', p.county ? 'Retrieved ' + day(p.county.retrievedAt) : 'Not retrieved'], ['Design style', p.design || 'Pending'],
     ['AI concepts', S.files.filter(f => f.kind === 'render').length + ' saved'], ['Team members', Math.max(0, S.members.length - 1) + ' collaborators'], ['Budget', fmt(p.budget) + ' (illustrative)']];

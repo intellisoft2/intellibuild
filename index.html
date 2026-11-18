@@ -4,7 +4,7 @@
 <meta name="description" content="IntelliBuild AI: property intelligence, AI replacement-home concepts, smart takeoffs, cost estimating and contractor bidding in one workspace."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
-<link href="app.css?v=3.0.2" rel="stylesheet"/>
+<link href="app.css?v=3.1.0" rel="stylesheet"/>
 </head><body>
 <div id="boot" class="boot">Intelli<span>Build</span> AI™</div>
 
@@ -67,7 +67,7 @@
   <div class="flex center-y hdr-right">
     <select id="projectSwitch" aria-label="Current project"></select>
     <span id="saveState" class="small"></span>
-    <button class="chip" id="creditBadge" title="AI credits">✦ <b id="creditCount">0</b> credits</button>
+    <button class="chip" id="creditBadge" title="AI credits">✦ <b id="creditCount">0</b><span class="hide-sm"> credits</span></button>
     <button class="chip" id="userBtn"></button>
   </div>
 </header>
@@ -87,6 +87,7 @@
   <button class="nav" data-tab="visualai" data-proj>✦ AI Visual Studio</button>
   <button class="nav" data-tab="conceptlab" data-proj>✧ Concept Lab</button>
   <button class="nav" data-tab="design" data-proj>◇ Design Studio</button>
+  <button class="nav" data-tab="docs" data-proj>▧ Plans &amp; Documents</button>
   <div class="navh">Cost &amp; build</div>
   <button class="nav" data-tab="budget" data-proj>＄ Cost Estimator</button>
   <button class="nav" data-tab="takeoffs" data-proj>▤ Smart Takeoffs</button>
@@ -206,8 +207,15 @@
     <label>Target floor area <b id="areaLabel"></b><input type="range" min="1200" max="10000" step="100" data-k="area"/></label>
     <label>Stories<select data-k="stories"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
     <label>Bedrooms<select data-k="newBeds"><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></label>
-    <label>Garage spaces<select data-k="garage"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div></div>
+    <label>Garage spaces<select data-k="garage"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+    <label>Bathrooms<select data-k="newBaths"><option>2</option><option>2.5</option><option>3</option><option>3.5</option><option>4</option><option>4.5</option><option>5</option><option>5.5</option><option>6</option></select></label>
+    <label>Foundation<select data-k="foundation"><option value="basement">Full basement</option><option value="crawlspace">Crawlspace</option><option value="slab">Slab on grade</option></select></label>
+    <label>Finish level<select data-k="finishTier"><option>Standard</option><option>Premium</option><option>Luxury</option></select></label></div>
+    <div class="flex"><button class="btn secondary" data-go="docs">View concept floor plan →</button><button class="btn secondary" data-go="materials">See materials &amp; labor →</button></div></div>
 </section>
+
+<!-- DOCS -->
+<section class="tab" id="docs"><div class="eyebrow">Plans &amp; documents</div><h1>Plans &amp; Documents</h1><p>Concept floor plan and project documents generated from your design. Replace them with architect drawings or your own documents at any time.</p><div id="docsBody"></div></section>
 
 <!-- BUDGET -->
 <section class="tab" id="budget"><div class="eyebrow">Step 03 · Estimate</div><h1>Construction Cost Estimator</h1><p>Editable planning assumptions. Replace with local contractor bids — bids entered on Contractor Bids are compared against this estimate.</p>
@@ -221,9 +229,11 @@
   <div class="card"><h2>Preliminary project budget</h2><div id="costRows"></div><div class="statrow mt"><strong>Estimated total</strong><strong id="grandTotal" class="total"></strong></div><div class="note">The construction rate is treated as an inclusive allowance (labor + materials). Excludes land, financing, temporary housing and exceptional site conditions.</div></div></div>
 </section>
 
-<section class="tab" id="materials"><div class="eyebrow">Step 04 · Procure</div><h1>Materials &amp; Labor</h1><p>Trade-based planning structure. Quantities are conceptual planning ranges, not engineering takeoffs.</p><div class="card"><h2>Preliminary material planning</h2><div id="materialRows"></div></div><div class="section card"><h2>Trade packages</h2><div id="laborRows"></div></div></section>
+<section class="tab" id="materials"><div class="eyebrow">Step 04 · Procure &amp; benchmark</div><h1>Materials &amp; Labor</h1><p>Current Northern Virginia material prices and BLS trade wages applied to this home's quantities. Use it as an independent estimate to level contractor bids.</p>
+  <div class="card"><div class="grid"><label>Finish level<select data-k="finishTier"><option>Standard</option><option>Premium</option><option>Luxury</option></select></label><label>Foundation<select data-k="foundation"><option value="basement">Full basement</option><option value="crawlspace">Crawlspace</option><option value="slab">Slab on grade</option></select></label><label>Bathrooms<select data-k="newBaths"><option>2</option><option>2.5</option><option>3</option><option>3.5</option><option>4</option><option>4.5</option><option>5</option><option>5.5</option><option>6</option></select></label><label>Proposed area<input type="number" min="600" max="20000" step="50" data-k="area"/></label></div></div>
+  <div id="mlBody" class="section"></div></section>
 <section class="tab" id="schedule"><div class="eyebrow">Step 05 · Deliver</div><h1>Project Timeline</h1><p>Illustrative sequential planning windows. Permit processing, weather and trade availability can change duration.</p><div class="card" id="scheduleRows"></div></section>
-<section class="tab" id="quality"><div class="eyebrow">Step 06 · Assure</div><h1>Permits, Safety &amp; Quality</h1><p>Checking a box is an internal acknowledgment shared with your team — not an official approval or inspection.</p><div class="card"><h2>Preconstruction and inspection checklist</h2><div id="checklist"></div><div class="section"><div class="progress"><div id="checkProgress"></div></div><p class="small" id="checkText"></p></div></div></section>
+<section class="tab" id="quality"><div class="eyebrow">Step 06 · Permits, safety &amp; quality</div><h1>Permits, Safety &amp; Quality</h1><p>Five phases from due diligence to closeout, with Fairfax County requirements, a responsible party, target date and notes for each item. Shared with your team. Checking an item records an internal acknowledgment, not an official approval.</p><div id="checklist"></div></section>
 
 <!-- FEASIBILITY -->
 <section class="tab" id="feasibility"><div class="eyebrow">Redevelopment intelligence · Pro</div><h1>Feasibility report</h1><p class="small">Preliminary redevelopment brief with transparent source confidence. Zoning, lot coverage and buildability are not certified.</p>
@@ -283,7 +293,7 @@
 
 <!-- ADMIN -->
 <section class="tab" id="admin"><div class="eyebrow">Administrator</div><h1>Admin console</h1>
-  <div class="seg" id="adminTabs"><button data-a="overview" class="on">Revenue &amp; costs</button><button data-a="users">Users</button><button data-a="settings">Pricing &amp; AI settings</button><button data-a="demo">Demo</button><button data-a="audit">Audit &amp; exports</button></div>
+  <div class="seg" id="adminTabs"><button data-a="overview" class="on">Revenue &amp; costs</button><button data-a="users">Users</button><button data-a="settings">Pricing &amp; AI settings</button><button data-a="pricebook">Price book</button><button data-a="demo">Demo</button><button data-a="audit">Audit &amp; exports</button></div>
   <div id="adminBody" class="section"></div>
 </section>
 
@@ -293,7 +303,9 @@
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="modal-card"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="flex mt end"><button class="btn secondary" id="modalCancel">Cancel</button><button class="btn" id="modalOk">OK</button></div></div></div>
 <div id="toasts" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=3.0.2"></script>
-<script src="app.js?v=3.0.2"></script>
-<script src="modules.js?v=3.0.2"></script>
+<script src="config.js?v=3.1.0"></script>
+<script src="app.js?v=3.1.0"></script>
+<script src="pricing.js?v=3.1.0"></script>
+<script src="modules.js?v=3.1.0"></script>
+<script src="features.js?v=3.1.0"></script>
 </body></html>

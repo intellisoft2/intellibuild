@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.0.2 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.1.0 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
@@ -233,22 +233,12 @@ function compute() {
   p.budget = Math.round(total);
   $('rateLabel').textContent = '$' + rate; $('areaLabel').textContent = area.toLocaleString() + ' sq ft'; $('mArea').textContent = area.toLocaleString() + ' sq ft'; $('mBudget').textContent = fmt(total); $('grandTotal').textContent = fmt(total);
   $('costRows').innerHTML = [['Construction (incl. trades & materials)', construction], ['Demolition', demo], ['Sitework & utility allowance', site], ['Design, permits & soft costs', soft], ['Contingency', cont]].map(([a, b]) => `<div class="statrow"><span>${a}</span><strong>${fmt(b)}</strong></div>`).join('');
-  $('materialRows').innerHTML = [['Floor area', area.toLocaleString() + ' sq ft'], ['Roof coverage allowance (conceptual)', Math.round(area / (Number(p.stories) || 2) * 1.25).toLocaleString() + ' sq ft'], ['Drywall surface allowance (conceptual)', Math.round(area * 3.5).toLocaleString() + ' sq ft'], ['Floor finishes allowance (conceptual)', Math.round(area * .9).toLocaleString() + ' sq ft']].map(([a, b]) => `<div class="statrow"><span>${a}</span><strong>${b}</strong></div>`).join('');
+  if ($('materialRows')) $('materialRows').innerHTML = [['Floor area', area.toLocaleString() + ' sq ft'], ['Roof coverage allowance (conceptual)', Math.round(area / (Number(p.stories) || 2) * 1.25).toLocaleString() + ' sq ft'], ['Drywall surface allowance (conceptual)', Math.round(area * 3.5).toLocaleString() + ' sq ft'], ['Floor finishes allowance (conceptual)', Math.round(area * .9).toLocaleString() + ' sq ft']].map(([a, b]) => `<div class="statrow"><span>${a}</span><strong>${b}</strong></div>`).join('');
 }
-const TRADES = ['Site preparation & excavation', 'Concrete & foundations', 'Structural framing', 'Roofing & exterior envelope', 'Electrical rough-in & fixtures', 'Plumbing rough-in & fixtures', 'HVAC systems', 'Insulation & drywall', 'Cabinets, flooring & painting', 'Landscaping & final grading'];
 const STAGES = [['Feasibility, survey and concept design', '4–8 weeks'], ['Architectural and engineering plans', '6–12 weeks'], ['Permit review and utility coordination', '8–20+ weeks'], ['Utility disconnects and demolition', '2–5 weeks'], ['Excavation and foundation', '4–8 weeks'], ['Framing, roof and weatherproofing', '8–14 weeks'], ['MEP rough-in and inspections', '5–10 weeks'], ['Insulation, drywall and interiors', '8–16 weeks'], ['Exterior, landscape and final inspections', '4–10 weeks'], ['Punch list and handover', '2–4 weeks']];
-const CHECKS = ['Verify parcel, zoning, setbacks and easements', 'Obtain current boundary and topographic survey', 'Complete asbestos/lead and demolition hazard assessments as applicable', 'Confirm utility disconnect requirements', 'Commission licensed architectural and engineering plans', 'Obtain demolition permit and required approvals', 'Obtain building permit', 'Complete foundation inspection', 'Complete framing and MEP rough-in inspections', 'Complete energy and insulation inspections', 'Complete final building inspections', 'Obtain certificate of occupancy or jurisdictional equivalent'];
 function renderStatic() {
-  $('laborRows').innerHTML = TRADES.map((t, i) => `<div class="statrow"><span>${String(i + 1).padStart(2, '0')} · ${t}</span><strong class="status"><a href="#bids" data-go="bids" class="link">Bids →</a></strong></div>`).join('');
   $('scheduleRows').innerHTML = STAGES.map(([n, d], i) => `<div class="statrow"><span><span style="color:var(--teal)">${String(i + 1).padStart(2, '0')}</span> &nbsp; ${n}</span><strong>${d}</strong></div>`).join('');
 }
-function renderChecklist() {
-  $('checklist').innerHTML = CHECKS.map((t, i) => `<label class="task"><input type="checkbox" data-check="${i}" ${S.P.checks[i] ? 'checked' : ''} ${S.canEdit ? '' : 'disabled'}/><span>${t}</span></label>`).join('');
-  qa('[data-check]').forEach(el => el.onchange = () => { S.P.checks[el.dataset.check] = el.checked; markDirty(); progress(); });
-  progress();
-}
-function progress() { const n = CHECKS.filter((_, i) => S.P.checks[i]).length, pct = Math.round(n / CHECKS.length * 100); $('checkProgress').style.width = pct + '%'; $('checkText').textContent = n + ' of ' + CHECKS.length + ' tasks acknowledged'; $('mTasks').textContent = pct + '% complete'; }
-
 /* ------------------------------------------------------------------ pro gating, feasibility, scenarios */
 function premium() { return !!(S.project && S.project.premium); }
 function lockHTML(feature) {
@@ -396,7 +386,7 @@ let adminCache = {};
 async function loadAdmin(which) {
   S.adminTab = which; qa('#adminTabs button').forEach(b => b.classList.toggle('on', b.dataset.a === which));
   const body = $('adminBody'); body.innerHTML = '<p class="small">Loading…</p>';
-  ({ overview: adminOverview, users: adminUsers, settings: adminSettings, demo: adminDemo, audit: adminAudit })[which]().catch(e => { body.innerHTML = '<p class="status">' + esc(e.message) + '</p>'; });
+  ({ overview: adminOverview, users: adminUsers, settings: adminSettings, pricebook: adminPricebook, demo: adminDemo, audit: adminAudit })[which]().catch(e => { body.innerHTML = '<p class="status">' + esc(e.message) + '</p>'; });
 }
 async function adminOverview() {
   const days = adminCache.days || 30, d = await api('admin.dashboard', { days }), k = d.kpis, h = d.health;
@@ -477,12 +467,10 @@ async function adminSettings() {
     <label>OpenAI image model<input data-text="imageModel" value="${esc(s.imageModel)}"/></label><label>OpenAI text model<input data-text="textModel" value="${esc(s.textModel)}"/></label></div>
     <h3 class="mt">Unit economics at ${fmt2(perCredit)}/credit (${packPrice.credits}-credit pack)</h3><table class="data"><thead><tr><th>Job</th><th class="num">Credits</th><th class="num">Price</th><th class="num">Est. cost</th><th class="num">Margin</th></tr></thead><tbody>${marginRow('Standard render', s.creditCosts.render_standard, s.providerCostEstimates.render_standard)}${marginRow('High-detail render', s.creditCosts.render_hd, s.providerCostEstimates.render_hd)}${marginRow('AI brief', s.creditCosts.brief, s.providerCostEstimates.brief)}</tbody></table><p class="small">Actual cost per job is computed from the provider's reported token usage and shown in Revenue &amp; costs.</p></div>
   <div class="card"><h2>Plans, packs &amp; provider prices</h2>${js('plans', 'Plans (prices in USD; maxProjects / collaborators −1 = unlimited)')}${js('creditPacks', 'Credit packs')}${js('providerCostEstimates', 'Fallback cost estimates per job (USD)')}${js('geminiTokenPrices', 'Gemini token prices (USD per 1M tokens)')}${js('imageTokenPrices', 'OpenAI image token prices (USD per 1M tokens)')}${js('textTokenPrices', 'Text token prices (USD per 1M tokens)')}<label>Enterprise contact<input data-text="enterpriseContact" value="${esc(s.enterpriseContact)}"/></label><label>Support email<input data-text="supportEmail" value="${esc(s.supportEmail)}"/></label></div></div>
-  <div class="card section"><h2>Platform keys</h2><p class="small">Write-only: saved keys are never shown again, only the last 4 characters. Leave a field blank to keep its current value.</p><div class="two" id="keyFields"><p class="small">Loading…</p></div><button class="btn secondary" id="saveKeys">Save keys</button></div>
+  <div class="card section"><h2>Platform keys</h2><p class="small">Secret keys are write-only: after saving, only the last 4 characters are shown. Paste a new value to replace a key, click <b>Save keys</b>, then <b>Test</b> to confirm it works.</p><div id="keyFields"><p class="small">Loading…</p></div><button class="btn secondary" id="saveKeys">Save keys</button></div>
   <div class="flex section"><button class="btn" id="saveSettings">Save settings</button><span class="small">Price changes apply to new checkouts immediately. Existing subscriptions keep their price until changed in Stripe.</span></div>`;
-  const renderKeys = k => { $('keyFields').innerHTML = [['GEMINI_API_KEY', 'Google Gemini API key (AIza…)', 'password'], ['OPENAI_API_KEY', 'OpenAI API key (optional alternative)', 'password'], ['STRIPE_SECRET_KEY', 'Stripe secret key (sk_live_… / sk_test_…)', 'password'], ['STRIPE_WEBHOOK_KEY', 'Optional webhook path secret (any long random string)', 'password'], ['SITE_URL', 'Public app URL', 'text'], ['ADMIN_EMAILS', 'Administrator emails (comma-separated)', 'text']]
-    .map(([n, l, t]) => `<label>${l}<input type="${t}" data-key="${n}" autocomplete="off" placeholder="${esc(k[n] || 'not set')}" ${t === 'text' ? `value="${esc(k[n] || '')}"` : ''}/></label>`).join(''); };
-  api('admin.keys', { keys: {} }).then(r => renderKeys(r.keys)).catch(fail);
-  $('saveKeys').onclick = async () => { const keys = {}; qa('[data-key]').forEach(el => { if (el.value.trim()) keys[el.dataset.key] = el.value.trim(); }); try { const r = await api('admin.keys', { keys }); renderKeys(r.keys); toast(r.changed.length ? 'Saved: ' + r.changed.join(', ') : 'No changes.'); } catch (e) { fail(e); } };
+  api('admin.keys', { keys: {} }).then(r => renderKeyPanel(r.keys)).catch(fail);
+  $('saveKeys').onclick = async () => { const keys = {}; qa('[data-key]').forEach(el => { if (el.value.trim() && !(el.type === 'text' && el.defaultValue === el.value)) keys[el.dataset.key] = el.value.trim(); }); try { const r = await api('admin.keys', { keys }); renderKeyPanel(r.keys); toast(r.changed.length ? 'Saved: ' + r.changed.join(', ') + '. Use Test to verify.' : 'No changes to save.'); } catch (e) { fail(e); } };
   $('saveSettings').onclick = async () => {
     const out = { creditCosts: Object.assign({}, s.creditCosts) };
     try {
@@ -581,4 +569,3 @@ function wire() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').classList.contains('hidden')) $('modalCancel').click(); });
 }
 
-wire(); renderStatic(); boot();
