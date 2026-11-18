@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.3 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.2.5 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
@@ -38,13 +38,20 @@ function renderIntel() {
     setTimeout(() => aerialMap.invalidateSize(), 150);
   }
 }
+/** OpenStreetMap building outlines within 100 m: server proxy first, then public Overpass mirrors directly from the browser. */
+async function getFootprints(lat, lon) {
+  try { return (await api('property.footprints', { lat, lon })).elements; } catch (e) { /* fall through to browser */ }
+  const q = `[out:json][timeout:20];(way["building"](around:100,${lat},${lon}););out geom;`;
+  for (const m of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
+    try { const r = await fetch(m, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); if (r.ok) return ((await r.json()).elements || []).filter(e => e.geometry && e.geometry.length > 2); } catch (e) { }
+  }
+  throw new Error('the OpenStreetMap building service is busy right now');
+}
 async function findFootprints() {
   const p = S.P; if (p.lat === null || p.lat === '') { $('footprintStatus').textContent = 'Geocode an address on Overview first.'; return; }
   const b = $('refreshFootprints'); busy(b, true, 'Searching…'); $('footprintStatus').textContent = 'Requesting nearby OpenStreetMap building outlines (100 m)…';
   try {
-    let els;
-    try { els = (await api('property.footprints', { lat: p.lat, lon: p.lon })).elements; }
-    catch (e) { const q = `[out:json][timeout:20];(way["building"](around:100,${p.lat},${p.lon}););out geom;`; const r = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); els = (await r.json()).elements || []; }
+    const els = await getFootprints(p.lat, p.lon);
     ensureAerial(); if (footprintLayer) aerialMap.removeLayer(footprintLayer); footprintLayer = L.layerGroup().addTo(aerialMap);
     let n = 0; els.forEach(f => { if (f.geometry && f.geometry.length > 2) { L.polygon(f.geometry.map(x => [x.lat, x.lon]), { color: '#44e1c3', weight: 2, fillOpacity: .16 }).addTo(footprintLayer); n++; } });
     p.intel = { buildingCount: n, lastChecked: new Date().toISOString() }; markDirty();
@@ -149,8 +156,9 @@ async function lookupCounty() {
     keys.forEach((k, i) => { const rows = settled[i].status === 'fulfilled' ? settled[i].value : []; tables[k] = latest(rows); counts[k] = rows.length; if (settled[i].status === 'rejected') errors.push(k + ': ' + settled[i].reason.message); });
     p.county = { pin, parcelType: hit.type || (tables.parcel.LUC_DESC ? '' : ''), method: hit.method, methodLabel: hit.label, nearby: hit.others || [], matchedAddress: p.matched, retrievedAt: new Date().toISOString(), tables, counts, errors };
     if (hit.centroid && hit.method !== 'point') { p.lat = +hit.centroid.lat.toFixed(6); p.lon = +hit.centroid.lon.toFixed(6); p.geoSource = 'parcel'; }
-    markDirty(); st.textContent = '✓ ' + hit.label + '. ' + keys.filter(k => counts[k]).length + ' of 4 assessment tables matched.' + (errors.length ? ' Some sources failed.' : '');
-    renderCounty(); if (window.renderJourney) renderJourney();
+    const ap = applyCountyFields(false);
+    st.textContent = '✓ ' + hit.label + '. ' + keys.filter(k => counts[k]).length + ' of 4 assessment tables matched · ' + ap.filled + ' field(s) filled automatically' + (ap.conflicts.length ? ' · ' + ap.conflicts.length + ' differ from your entries (review below)' : '') + '.' + (errors.length ? ' Some sources failed.' : '');
+    renderCounty(); renderPropRecord(); if (window.renderJourney) renderJourney();
   } catch (e) { st.textContent = 'County lookup unavailable: ' + e.message + '. No property values have been inferred.'; }
   finally { busy(b, false); }
 }
@@ -160,15 +168,46 @@ function renderCounty() {
   if (!c) { $('countyParcel').innerHTML = '<p>No verified parcel loaded.</p>'; $('countyDwelling').innerHTML = '<p>No dwelling records loaded.</p>'; $('countyProvenance').textContent = premium() ? '' : 'Official records are included with Homeowner Pro or Builder Pro.'; return; }
   const p = c.tables.parcel || {}, d = c.tables.dwelling || {}, l = c.tables.land || {}, a = c.tables.assessment || {};
   $('countyParcel').innerHTML = [countyLine('Parcel PIN', c.pin, c.methodLabel || 'Fairfax GIS parcel geometry'), countyLine('Parcel type', c.parcelType, 'County parcel layer'), countyLine('Zoning description', p.ZONING_DESC, 'County tax parcel table'), countyLine('Land use', p.LUC_DESC, 'County tax parcel table'), countyLine('Land size (sq ft)', l.SF, 'County land table')].join('');
-  $('countyDwelling').innerHTML = [countyLine('Year built', d.YRBLT, 'County dwelling table'), countyLine('Above-grade living area (sq ft)', d.SFLA, 'County dwelling table'), countyLine('Bedrooms', d.RMBED, 'County dwelling table'), countyLine('Full bathrooms', d.FIXBATH, 'County dwelling table'), countyLine('Half bathrooms', d.FIXHALF, 'County dwelling table'), countyLine('Style', d.STYLE_DESC, 'County dwelling table'), countyLine('Condition', d.CDU_DESC, 'County dwelling table'), countyLine('Current assessed value', (v => v === null ? null : isNaN(+v) ? v : fmt(+v))(firstValue(a, ['TOTAL', 'TOTAL_VALUE', 'TOTVAL', 'TOTALVAL', 'CURR_TOTAL', 'TOT_ASMT'])), 'County assessment' + (a.TAXYR ? ' · tax year ' + a.TAXYR : ''))].join('');
+  $('countyDwelling').innerHTML = [countyLine('Year built', d.YRBLT, 'County dwelling table'), countyLine('Above-grade living area (sq ft)', d.SFLA, 'County dwelling table'), countyLine('Bedrooms', d.RMBED, 'County dwelling table'), countyLine('Full bathrooms', d.FIXBATH, 'County dwelling table'), countyLine('Half bathrooms', d.FIXHALF, 'County dwelling table'), countyLine('Style', d.STYLE_DESC, 'County dwelling table'), countyLine('Condition', d.CDU_DESC, 'County dwelling table'), countyLine('Construction grade', d.GRADE_DESC, 'County dwelling table'), countyLine('Basement', [d.BSMT_DESC, d.USER9_DESC].filter(Boolean).join(' · ') || null, 'County dwelling table'),
+    countyLine('Finished rec room (sq ft)', d.RECROMAREA, 'County dwelling table'), countyLine('Exterior walls', d.EXTWALL_DESC, 'County dwelling table'), countyLine('Heating / cooling', d.HEAT_DESC, 'County dwelling table'),
+    countyLine('Fireplaces', d.WBFP_PF, 'County dwelling table'), countyLine('Other material noted', d.USER13_DESC, 'County dwelling table — confirm in hazmat survey'), countyLine('Current assessed value', (v => v === null ? null : isNaN(+v) ? v : fmt(+v))(firstValue(a, ['TOTAL', 'TOTAL_VALUE', 'TOTVAL', 'TOTALVAL', 'CURR_TOTAL', 'TOT_ASMT'])), 'County assessment' + (a.TAXYR ? ' · tax year ' + a.TAXYR : ''))].join('');
+  renderCountyConflicts();
   $('countyProvenance').textContent = 'Retrieved ' + when(c.retrievedAt) + ' · PIN ' + c.pin + ' · record counts: ' + Object.entries(c.counts).map(([k, v]) => k + ' ' + v).join(', ') + '. ' + (c.errors.length ? 'Errors: ' + c.errors.join('; ') : 'No API errors.') + ' Source data may lag real-world changes.';
 }
+/** County values mapped to project fields. */
+function countyFieldValues() {
+  const c = S.P.county; if (!c) return [];
+  const d = c.tables.dwelling || {}, l = c.tables.land || {}, p = c.tables.parcel || {};
+  const baths = d.FIXBATH !== undefined && d.FIXBATH !== null ? Number(d.FIXBATH) + 0.5 * Number(d.FIXHALF || 0) : null;
+  return [['existingArea', 'Existing floor area (sq ft)', d.SFLA], ['yearBuilt', 'Year built', d.YRBLT], ['bedrooms', 'Bedrooms', d.RMBED], ['bathrooms', 'Bathrooms', baths],
+    ['lotArea', 'Lot size (sq ft)', l.SF], ['zone', 'Zoning', p.ZONING_DESC], ['parcelInput', 'Parcel ID', c.pin]]
+    .filter(r => r[2] !== null && r[2] !== undefined && r[2] !== '').map(([k, label, v]) => ({ k, label, county: NUMERIC.has(k) ? Number(v) : String(v) }));
+}
+/** Fills empty fields from county records (or all fields when overwrite=true). Returns fields where the owner's entry differs. */
+function applyCountyFields(overwrite) {
+  const rows = countyFieldValues(); let n = 0; const conflicts = [];
+  rows.forEach(r => {
+    const cur = S.P[r.k], empty = cur === '' || cur === null || cur === undefined || (NUMERIC.has(r.k) && !Number(cur));
+    if (empty || overwrite) { if (String(cur) !== String(r.county)) { S.P[r.k] = r.county; n++; } }
+    else if (String(cur).replace(/\s+/g, ' ').trim().toUpperCase() !== String(r.county).replace(/\s+/g, ' ').trim().toUpperCase()) conflicts.push(Object.assign({ mine: cur }, r));
+  });
+  if (rows.length) S.P.source = 'county';
+  S.P.countyConflicts = conflicts.map(c => c.k);
+  fillAll(); compute(); markDirty(); renderCountyConflicts();
+  return { filled: n, conflicts };
+}
+function renderCountyConflicts() {
+  const box = $('countyConflicts'); if (!box) return;
+  const rows = countyFieldValues().filter(r => (S.P.countyConflicts || []).includes(r.k) && String(S.P[r.k]) !== String(r.county));
+  if (!rows.length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="note"><b>Your entries differ from the county record.</b> Choose which to keep:</div><div class="scroll"><table class="data"><thead><tr><th>Field</th><th class="num">Your entry</th><th class="num">Fairfax County</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${esc(S.P[r.k])}</td><td class="num"><b>${esc(r.county)}</b></td><td><div class="flex"><button class="btn sm" data-cc-use="${r.k}" ${S.canEdit ? '' : 'disabled'}>Use county</button><button class="btn sm secondary" data-cc-keep="${r.k}" ${S.canEdit ? '' : 'disabled'}>Keep mine</button></div></td></tr>`).join('')}</tbody></table></div>`;
+  qa('[data-cc-use]', box).forEach(b => b.onclick = () => { const r = rows.find(x => x.k === b.dataset.ccUse); S.P[r.k] = r.county; S.P.countyConflicts = S.P.countyConflicts.filter(k => k !== r.k); fillAll(); compute(); markDirty(); renderCountyConflicts(); renderPropRecord(); });
+  qa('[data-cc-keep]', box).forEach(b => b.onclick = () => { S.P.countyConflicts = S.P.countyConflicts.filter(k => k !== b.dataset.ccKeep); markDirty(); renderCountyConflicts(); });
+}
 function applyCounty() {
-  const c = S.P.county; if (!c) return toast('Find an official parcel first.', { err: true });
-  const d = c.tables.dwelling || {}, l = c.tables.land || {}, p = c.tables.parcel || {}; let n = 0;
-  const put = (k, v) => { if (v !== null && v !== undefined && v !== '') { S.P[k] = NUMERIC.has(k) ? Number(v) : v; n++; } };
-  put('existingArea', d.SFLA); put('yearBuilt', d.YRBLT); put('bedrooms', d.RMBED); put('lotArea', l.SF); put('zone', p.ZONING_DESC); S.P.parcelInput = c.pin; S.P.source = 'county';
-  fillAll(); compute(); markDirty(); toast(n + ' fields populated from official records. Review each value before relying on it.');
+  if (!S.P.county) return toast('Find an official parcel first.', { err: true });
+  const r = applyCountyFields(true); S.P.countyConflicts = []; renderCountyConflicts(); renderPropRecord();
+  toast(r.filled + ' field(s) updated from official county records. Review each value before relying on it.');
 }
 
 /* ------------------------------------------------------------------ AI visual studio */

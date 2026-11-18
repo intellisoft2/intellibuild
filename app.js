@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.2.3 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.2.5 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.2.3';
+const VERSION = '3.2.5';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];

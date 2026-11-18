@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.3 — guided project journey, Autopilot, and the narrated demo tour */
+/* IntelliBuild AI™ v3.2.5 — guided project journey, Autopilot, and the narrated demo tour */
 'use strict';
 
 /* ================================================================== journey */
@@ -83,17 +83,16 @@ async function autopilot() {
   });
   await run('map', async () => {
     if (S.P.lat === null || S.P.lat === '') return { skip: 1, note: 'Needs a located address' };
-    const els = (await api('property.footprints', { lat: S.P.lat, lon: S.P.lon })).elements;
+    let els;
+    try { els = await getFootprints(S.P.lat, S.P.lon); } catch (e) { return { skip: 1, note: 'Optional — map service busy; retry later on Property Intelligence' }; }
     S.P.intel = { buildingCount: els.length, lastChecked: new Date().toISOString() }; return { note: els.length + ' mapped buildings within 100 m' };
   });
   await run('records', async () => {
-    if (S.P.county) return { note: 'Already retrieved' };
+    if (S.P.county) { const r = applyCountyFields(false); return { note: 'PIN ' + S.P.county.pin + ' · ' + r.filled + ' field(s) filled' + (r.conflicts.length ? ' · ' + r.conflicts.length + ' differ from your entries — review on County Records' : '') }; }
     if (!S.P.matched || !/,\s*VA\b/i.test(S.P.matched)) return { skip: 1, note: 'Official records available for Fairfax County, VA' };
     if (!premium()) return { skip: 1, note: 'Pro feature — unlock to auto-pull official records' };
     await lookupCounty(); if (!S.P.county) return { skip: 1, note: $('recordStatus').textContent.slice(0, 90) };
-    const d = S.P.county.tables.dwelling || {}, l = S.P.county.tables.land || {}, pp = S.P.county.tables.parcel || {};
-    if (d.SFLA) S.P.existingArea = Number(d.SFLA); if (d.YRBLT) S.P.yearBuilt = Number(d.YRBLT); if (d.RMBED) S.P.bedrooms = Number(d.RMBED); if (l.SF) S.P.lotArea = Number(l.SF); if (pp.ZONING_DESC) S.P.zone = pp.ZONING_DESC;
-    S.P.parcelInput = S.P.county.pin; S.P.source = 'county'; return { note: 'PIN ' + S.P.county.pin };
+    const r = { conflicts: (S.P.countyConflicts || []) }; return { note: 'PIN ' + S.P.county.pin + (r.conflicts.length ? ' · ' + r.conflicts.length + ' differ from your entries — review on County Records' : ' · fields filled') };
   });
   await run('program', async () => { if (suggestProgram(S.P)) return { note: S.P.area.toLocaleString() + ' sq ft · ' + S.P.newBeds + ' bed · ' + S.P.newBaths + ' bath' }; return { skip: 1, note: S.P.designTouched ? 'Kept your design choices' : 'Add existing-home size for a suggestion' }; });
   await run('price', async () => { const cb = costbook(); if (!cb) return { skip: 1 }; const e = IBPricing.estimate(S.P, cb); S.P.rate = Math.round(e.totals.contract / Number(S.P.area) / 5) * 5; compute(); return { note: fmt(e.totals.contract) + ' expected contract · ' + fmt(e.totals.low) + '–' + fmt(e.totals.high) + ' bid range' }; });

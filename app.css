@@ -59,7 +59,7 @@ label.check{display:flex;gap:10px;align-items:flex-start}label.check input{width
 .seg{display:inline-flex;background:#0a1828;border:1px solid var(--border);border-radius:11px;padding:4px;gap:4px;flex-wrap:wrap}.seg button{background:none;border:0;color:#b8c9dd;padding:8px 14px;border-radius:8px}.seg button.on{background:#1b344b;color:#fff}
 .thread{max-height:380px;overflow:auto;display:flex;flex-direction:column;gap:10px}.msg{background:var(--panel2);border-radius:12px;padding:10px 13px;max-width:88%}.msg.mine{align-self:flex-end;background:#16372f}.msg .meta{font-size:11px;color:var(--muted);margin-bottom:4px}
 .filegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}.filegrid .card{padding:10px}.filegrid img,.filegrid .doc{width:100%;height:150px;object-fit:cover;border-radius:10px;background:#0a1828;display:flex;align-items:center;justify-content:center;font-size:40px}
-.modal{position:fixed;inset:0;background:rgba(3,8,15,.7);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px}.modal-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;width:min(520px,100%);max-height:90vh;overflow:auto}
+.modal{position:fixed;inset:0;background:rgba(3,8,15,.7);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}.modal-card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;width:min(520px,100%);max-height:90vh;overflow:auto}
 #toasts{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:70}.toast{background:#13263c;border:1px solid #3a5068;border-left:4px solid var(--teal);padding:12px 16px;border-radius:10px;max-width:380px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.4)}.toast.err{border-left-color:var(--red)}.toast button{margin-top:8px}
 .locked{position:relative}.lockpane{border:1px dashed #6b5520;background:#1c1a12;border-radius:14px;padding:22px;margin:14px 0}
 /* landing */
@@ -141,3 +141,6 @@ body.touring .content{padding-bottom:240px}
 .spin.sm{width:13px;height:13px;margin-right:8px;vertical-align:-2px;border-color:currentColor;border-right-color:transparent}
 .btn.is-busy{opacity:.85;cursor:progress}
 body.touring #loadpill{bottom:auto;top:80px}
+
+/* overlays above Leaflet maps (Leaflet panes/controls use z-index 400–1000) */
+.leaflet-container{z-index:0}#tourBox{z-index:1100}#toasts{z-index:1200}#loadbar,#loadpill{z-index:1300}header{z-index:900}aside.open{z-index:950}
