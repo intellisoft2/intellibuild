@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.1.0 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.2.0 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
@@ -225,7 +225,7 @@ const STYLES = [['Modern Farmhouse', '⌂', 'Warm traditional forms with clean c
   ['Craftsman', '▤', 'Porches, natural materials and detailed trim'], ['Transitional', '◇', 'A balanced mix of classic and modern'], ['Mediterranean', '☼', 'Stucco, tile roofing and courtyard living']];
 function renderDesigns() {
   $('designCards').innerHTML = STYLES.map(([n, i, d]) => `<div class="design ${S.P.design === n ? 'selected' : ''}"><div class="art">${i}</div><div class="body"><h3>${n}</h3><p class="small">${d}</p><button class="btn ${S.P.design === n ? '' : 'secondary'}" data-style="${n}" ${S.canEdit ? '' : 'disabled'}>${S.P.design === n ? '✓ Selected' : 'Choose style'}</button></div></div>`).join('');
-  qa('[data-style]').forEach(b => b.onclick = () => { S.P.design = b.dataset.style; markDirty(); renderDesigns(); });
+  qa('[data-style]').forEach(b => b.onclick = () => { S.P.design = b.dataset.style; S.P.designTouched = true; markDirty(); renderDesigns(); if (window.renderJourney) renderJourney(); });
 }
 function compute() {
   const p = S.P, area = Number(p.area) || 0, rate = Number(p.rate) || 0, demo = Number(p.demo) || 0, site = Number(p.site) || 0, construction = area * rate, soft = construction * (Number(p.soft) || 0) / 100;
@@ -275,6 +275,7 @@ async function loadBids() {
   const d = await api('bids.list', { projectId: S.pid }); bidCache = d.bids; renderBids(isMgr);
 }
 function renderBids(isMgr) {
+  S.bidStats = { count: bidCache.length, awarded: bidCache.filter(x => x.status === 'awarded').length }; if (window.renderJourney) renderJourney();
   const b = bidCache, est = Number(S.P.budget) || 0, prices = b.map(x => x.price).sort((a, c) => a - c), median = prices.length ? prices[Math.floor((prices.length - 1) / 2)] : 0;
   $('bidStats').innerHTML = [['Bids received', b.length], ['Lowest bid', prices.length ? fmt(prices[0]) : '—'], ['Median bid', prices.length ? fmt(median) : '—'], ['IntelliBuild estimate', fmt(est)]].map(([a, v]) => `<div class="card"><div class="small">${a}</div><div class="metric">${v}</div></div>`).join('');
   const max = Math.max(est, ...prices, 1);
@@ -284,7 +285,9 @@ function renderBids(isMgr) {
     <td><div class="flex">${isMgr ? ['shortlisted', 'awarded', 'declined'].filter(s => s !== x.status).map(s => `<button class="btn sm secondary" data-bs="${x.id}" data-st="${s}">${{ shortlisted: 'Shortlist', awarded: 'Award', declined: 'Decline' }[s]}</button>`).join('') : ''}${x.mine ? `<button class="btn sm secondary" data-be="${x.id}">Edit</button>` : ''}${x.mine && !isMgr && x.status !== 'withdrawn' ? `<button class="btn sm danger" data-bs="${x.id}" data-st="withdrawn">Withdraw</button>` : ''}${isMgr || x.mine ? `<button class="btn sm danger" data-br="${x.id}">Remove</button>` : ''}</div></td></tr>`).join('')}</tbody></table>` : '<p>No bids yet. Invite contractors from Team &amp; Messages.</p>';
   qa('[data-bs]').forEach(btn => btn.onclick = async () => {
     let note; if (btn.dataset.st === 'awarded') { const v = await modal('Award this bid?', '<p>The contractor is emailed that their bid was awarded.</p><label>Note (optional)<input name="note"/></label>', 'Award'); if (!v) return; note = v.note; }
-    try { await api('bids.update', { id: btn.dataset.bs, status: btn.dataset.st, note }); toast('Bid ' + btn.dataset.st + '.'); loadBids(); } catch (e) { fail(e); }
+    try { await api('bids.update', { id: btn.dataset.bs, status: btn.dataset.st, note }); toast('Bid ' + btn.dataset.st + '.');
+      if (btn.dataset.st === 'awarded' && S.canEdit) { const st = checklistState(); st.bids = Object.assign({}, st.bids, { done: true, doneAt: new Date().toISOString(), by: S.user ? S.user.name : '' }); markDirty(); toast('Checklist updated: contractor bids leveled & awarded.'); }
+      loadBids(); } catch (e) { fail(e); }
   });
   qa('[data-br]').forEach(btn => btn.onclick = async () => { if (!(await modal('Remove bid?', '<p>This deletes the bid from the register.</p>', 'Remove'))) return; try { await api('bids.update', { id: btn.dataset.br, remove: true }); loadBids(); } catch (e) { fail(e); } });
   qa('[data-be]').forEach(btn => btn.onclick = () => { const x = bidCache.find(y => y.id === btn.dataset.be); $('bidId').value = x.id; $('bidName').value = x.firm; $('bidPrice').value = x.price; $('bidMonths').value = x.months; $('bidScope').value = x.scope; $('bidExcl').value = x.exclusions; $('addBid').textContent = 'Update bid'; $('cancelBidEdit').classList.remove('hidden'); $('bidName').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
@@ -527,7 +530,7 @@ function wire() {
   formSubmit('signupForm', async v => { const d = await api('signup', Object.assign(v, { inviteToken: S.inviteToken || undefined })); toast('Welcome! Check your inbox to verify your email.'); await afterAuth(d); });
   formSubmit('forgotForm', async v => { await api('forgotPassword', v); $('authMsg').textContent = 'If an account exists for that email, a reset link is on its way.'; });
   formSubmit('resetForm', async v => { const d = await api('resetPassword', { resetToken: S.resetToken, password: v.password }); toast('Password updated.'); await afterAuth(d); });
-  $('exploreDemo').onclick = startGuest; $('guestSignup').onclick = () => showAuth('signup');
+  $('exploreDemo').onclick = startGuest; $('guestSignup').onclick = () => showAuth('signup'); $('heroSignup').onclick = () => { setAuthMode('signup'); $('signupForm').querySelector('input').focus(); };
   $('userBtn').onclick = () => S.guest ? showAuth('signup') : tab('account');
   $('creditBadge').onclick = () => tab('billing');
   $('projectSwitch').onchange = async e => { const v = e.target.value; if (v === '__new') { renderSwitcher(); return newProject(false); } if (!v) return; try { await openProject(v); tab(PROJECT_TABS.has(S.current) ? S.current : 'overview'); } catch (er) { fail(er); renderSwitcher(); } };
@@ -556,7 +559,13 @@ function wire() {
   $('printFeas').onclick = () => { if (!requirePro('The feasibility report')) return; renderFeas(); document.body.classList.add('print-feas'); window.print(); setTimeout(() => document.body.classList.remove('print-feas'), 600); };
   $('exportFeas').onclick = () => { if (!requirePro('Feasibility export')) return; downloadJSON('intellibuild-feasibility.json', { property: currentProperty(), design: { style: S.P.design, area: S.P.area, budget: S.P.budget }, county: S.P.county, disclaimer: 'Preliminary planning only; no zoning or engineering certification.' }); };
   $('addBid').onclick = submitBid; $('cancelBidEdit').onclick = clearBidForm;
-  $('sendInvite').onclick = async () => { const b = $('sendInvite'); busy(b, true, 'Sending…'); try { const r = await api('members.invite', { projectId: S.pid, email: $('invEmail').value, role: $('invRole').value }); $('inviteResult').innerHTML = (r.emailed ? 'Invitation emailed. ' : 'Email could not be sent — share this link: ') + `<a class="link" href="${esc(r.inviteLink)}">${esc(r.inviteLink)}</a>`; $('invEmail').value = ''; loadTeam(); } catch (e) { fail(e); } finally { busy(b, false); } };
+  $('sendInvite').onclick = async () => {
+    const emails = [...new Set($('invEmail').value.split(/[\s,;]+/).map(x => x.trim()).filter(x => x.includes('@')))];
+    if (!emails.length) return toast('Enter at least one email address.', { err: true });
+    const b = $('sendInvite'); busy(b, true, 'Sending ' + emails.length + '…'); const out = [];
+    for (const em of emails) { try { const r = await api('members.invite', { projectId: S.pid, email: em, role: $('invRole').value }); out.push(`✓ ${esc(em)} — ${r.emailed ? 'emailed' : 'email failed, share the link'} · <a class="link" href="${esc(r.inviteLink)}" title="Copy and share by text if needed">invite link</a>`); } catch (e) { out.push(`✗ ${esc(em)} — ${esc(e.message)}`); if (e.code === 'upgrade') break; } }
+    $('inviteResult').innerHTML = out.join('<br/>'); $('invEmail').value = ''; busy(b, false); loadTeam();
+  };
   $('addTask').onclick = async () => { try { await api('tasks.save', { projectId: S.pid, title: $('taskTitle').value, assigneeId: $('taskAssignee').value, due: $('taskDue').value }); $('taskTitle').value = ''; $('taskDue').value = ''; loadTasks(); loadActivity(); } catch (e) { fail(e); } };
   $('sendMsg').onclick = async () => { const t = $('msgText').value.trim(); if (!t) return; try { await api('comments.add', { projectId: S.pid, text: t }); $('msgText').value = ''; loadThread(); } catch (e) { fail(e); } };
   $('msgText').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('sendMsg').click(); });

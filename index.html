@@ -4,13 +4,13 @@
 <meta name="description" content="IntelliBuild AI: property intelligence, AI replacement-home concepts, smart takeoffs, cost estimating and contractor bidding in one workspace."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
-<link href="app.css?v=3.1.0" rel="stylesheet"/>
+<link href="app.css?v=3.2.0" rel="stylesheet"/>
 </head><body>
 <div id="boot" class="boot">Intelli<span>Build</span> AI™</div>
 
 <!-- ============ PUBLIC / AUTH ============ -->
 <div id="authView" class="hidden">
-  <header><div class="logo">Intelli<span>Build</span> AI™</div><div class="flex"><a class="link" href="#pricing" id="toPricing">Pricing</a><button class="btn secondary sm" id="exploreDemo">Explore live demo</button></div></header>
+  <header><div class="logo">Intelli<span>Build</span> AI™</div><div class="flex"><a class="link" href="#pricing" id="toPricing">Pricing</a><button class="btn secondary sm" data-tour>▶ Guided demo</button><button class="btn secondary sm" id="exploreDemo">Explore on my own</button></div></header>
   <section class="landing">
     <div class="landing-copy">
       <div class="eyebrow">Property intelligence → AI design → Construction</div>
@@ -22,7 +22,8 @@
         <div>▤ Smart takeoffs, cost estimator, scenarios and feasibility reports</div>
         <div>♧ Contractor portal: invites, bids, tasks and project messaging</div>
       </div>
-      <p class="small">Your projects, photos and renders are saved securely to your account and available on any device.</p>
+      <div class="flex"><button class="btn" data-tour>▶ Watch the 2-minute guided demo</button><button class="btn secondary" id="heroSignup">Start free</button></div>
+      <p class="small">Narrated walkthrough of a complete sample project — sound on. No sign-up needed.</p>
     </div>
     <div class="card auth-card">
       <div class="seg" id="authTabs"><button data-mode="login" class="on">Sign in</button><button data-mode="signup">Create account</button></div>
@@ -56,6 +57,12 @@
       <p id="authMsg" class="status" role="status" aria-live="polite"></p>
     </div>
   </section>
+  <section class="how"><h2>From address to awarded contractor in 9 guided steps</h2><div class="how-grid">
+    <div class="card"><span class="how-n">1</span><h3>Locate &amp; verify</h3><p class="small">Census-matched address, satellite context and official Fairfax County parcel, dwelling and assessment records.</p></div>
+    <div class="card"><span class="how-n">2</span><h3>Design &amp; visualize</h3><p class="small">Pick a style and size, see an AI concept of your new home, and get a concept floor plan with room schedule.</p></div>
+    <div class="card"><span class="how-n">3</span><h3>Price the build</h3><p class="small">About 50 line items priced with current Northern Virginia material prices and published local labor wages.</p></div>
+    <div class="card"><span class="how-n">4</span><h3>Bid, permit &amp; build</h3><p class="small">Invite contractors, level bids against the estimate, and track permits, safety and inspections to closeout.</p></div></div>
+    <p class="center small">✨ <b>Autopilot</b> fills in a new project from just the address — records, program, budget, schedule and floor plan.</p></section>
   <section class="landing-pricing" id="pricing"><h2>Simple pricing</h2><div class="grid plans" id="publicPlans"></div><div id="publicPacks"></div></section>
   <div class="foot center">© Intellisoft Technologies Inc. · IntelliBuild AI™ v<span class="ver"></span> · All property, design, cost and permitting outputs require independent professional verification.</div>
 </div>
@@ -104,13 +111,14 @@
   <button class="nav admin-only hidden" data-tab="admin">▥ Admin Console</button>
 </aside>
 <div class="content">
+<div id="journey" class="jr hidden"></div>
 
 <!-- PROJECTS -->
 <section class="tab" id="projects">
   <div class="eyebrow">Workspace</div><h1>Your projects</h1>
   <p id="entLine" class="small"></p>
   <div id="inviteList"></div>
-  <div class="flex"><button class="btn" id="newProject">＋ New project</button><button class="btn secondary" id="copyDemo">Copy sample project to my workspace</button><button class="btn secondary" id="openDemo">View live sample</button></div>
+  <div class="flex"><button class="btn" id="newProject">＋ New project</button><button class="btn secondary" data-tour>▶ Guided tour</button><button class="btn secondary" id="copyDemo">Copy sample project to my workspace</button><button class="btn secondary" id="openDemo">View live sample</button></div>
   <div class="section grid" id="projectCards"></div>
   <div id="guestCta" class="hero hidden"><h2>Save your own projects</h2><p>Create a free account to store property evidence, upload photos and plans, generate AI concepts and invite contractors.</p><button class="btn" id="guestSignup">Create free account</button></div>
 </section>
@@ -263,7 +271,7 @@
 <!-- TEAM -->
 <section class="tab" id="team"><div class="eyebrow">Collaboration</div><h1>Team &amp; messages</h1><p class="small" id="teamIntro"></p>
   <div class="two"><div class="card"><h2>Project team</h2><div id="memberList"></div>
-    <div id="inviteBox" class="mt"><h3>Invite a contractor, architect or co-owner</h3><div class="two"><label>Email<input id="invEmail" type="email" placeholder="name@company.com"/></label><label>Role<select id="invRole"><option value="contractor">Contractor (view, bid, tasks, messages)</option><option value="editor">Editor (architect / co-owner)</option><option value="viewer">Viewer (read-only)</option></select></label></div><button class="btn" id="sendInvite">Send invitation</button><p class="small" id="inviteResult"></p></div></div>
+    <div id="inviteBox" class="mt"><h3>Invite contractors, architects or co-owners</h3><div class="two"><label>Emails (one or many — paste a list)<textarea id="invEmail" rows="2" placeholder="builder1@company.com, builder2@company.com"></textarea></label><label>Role<select id="invRole"><option value="contractor">Contractor (view, bid, tasks, messages)</option><option value="editor">Editor (architect / co-owner)</option><option value="viewer">Viewer (read-only)</option></select></label></div><button class="btn" id="sendInvite">Send invitation</button><p class="small" id="inviteResult"></p></div></div>
   <div class="card"><h2>Tasks</h2><div class="flex"><input id="taskTitle" placeholder="New task (e.g. Upload boundary survey)" class="grow"/><select id="taskAssignee"></select><input id="taskDue" type="date"/><button class="btn" id="addTask">Add</button></div><div id="taskList" class="mt"></div></div></div>
   <div class="two section"><div class="card"><h2>Project messages</h2><div id="thread" class="thread"></div><div class="flex mt"><textarea id="msgText" rows="2" class="grow" placeholder="Write a message to the project team…"></textarea><button class="btn" id="sendMsg">Send</button></div></div>
   <div class="card"><h2>Recent activity</h2><div id="activity"></div></div></div>
@@ -303,9 +311,10 @@
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="modal-card"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="flex mt end"><button class="btn secondary" id="modalCancel">Cancel</button><button class="btn" id="modalOk">OK</button></div></div></div>
 <div id="toasts" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=3.1.0"></script>
-<script src="app.js?v=3.1.0"></script>
-<script src="pricing.js?v=3.1.0"></script>
-<script src="modules.js?v=3.1.0"></script>
-<script src="features.js?v=3.1.0"></script>
+<script src="config.js?v=3.2.0"></script>
+<script src="app.js?v=3.2.0"></script>
+<script src="pricing.js?v=3.2.0"></script>
+<script src="modules.js?v=3.2.0"></script>
+<script src="journey.js?v=3.2.0"></script>
+<script src="features.js?v=3.2.0"></script>
 </body></html>

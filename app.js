@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.1.0 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.2.0 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.1.0';
+const VERSION = '3.2.0';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -215,12 +215,12 @@ function renderProjects() {
 }
 async function newProject(fromDemo) {
   let v = { name: '', address: '' };
-  if (!fromDemo) { v = await modal('New project', '<label>Project name<input name="name" placeholder="e.g. Oakton rebuild"/></label><label>Property address (optional)<input name="address" placeholder="Street, city, state ZIP"/></label>', 'Create project'); if (!v) return; }
+  if (!fromDemo) { v = await modal('New project', '<label>Project name<input name="name" placeholder="e.g. Oakton rebuild"/></label><label>Property address<input name="address" placeholder="Street, city, state ZIP"/></label><p class="small">✨ With an address, Autopilot sets up records, program, budget, permit schedule and a concept floor plan for you.</p>', 'Create project'); if (!v) return; }
   try {
     const r = await api('projects.create', { name: v.name, fromDemo: !!fromDemo, data: fromDemo ? undefined : { address: v.address } });
     await loadProjects(); await openProject(r.project.id); tab('overview');
     toast(fromDemo ? 'Sample copied — it is now your editable project.' : 'Project created.');
-    if (v.address) lookup();
+    if (v.address) autopilot();
   } catch (e) { fail(e); }
 }
 function closeProject() { S.pid = null; S.project = null; S.P = clone(DEFAULTS); localStorage.removeItem('ib_project'); syncNav(); renderSwitcher(); setBanner(''); }
