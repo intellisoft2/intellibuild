@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.2.5 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.2.6 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.2.5';
+const VERSION = '3.2.6';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -73,10 +73,10 @@ function merged(data) { const p = Object.assign(clone(DEFAULTS), data || {}); p.
 const P = () => S.P;
 
 /* ------------------------------------------------------------------ API, toasts, modal */
-async function api(action, payload = {}) {
+async function api(action, payload = {}, label) {
   if (!CFG.api) throw Object.assign(new Error('The IntelliBuild service is not configured yet.'), { code: 'config' });
   let r;
-  try { r = await fetch(CFG.api, { method: 'POST', ibLabel: LOAD_LABELS[action] || (action.startsWith('admin.') ? 'Loading admin data…' : 'Working…'), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, token: S.token }, payload)) }); }
+  try { r = await fetch(CFG.api, { method: 'POST', ibLabel: label || LOAD_LABELS[action] || (action.startsWith('admin.') ? 'Loading admin data…' : 'Working…'), headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action, token: S.token }, payload)) }); }
   catch (e) { throw new Error('Cannot reach the IntelliBuild service. Check your connection and try again.'); }
   let j; try { j = await r.json(); } catch (e) { throw new Error('The service returned an unexpected response. Please try again.'); }
   if (!j.ok) {
@@ -425,15 +425,15 @@ function renderThumbs() {
   hydrateImages($('thumbs'));
 }
 async function uploadFiles(files) {
-  const kind = $('uploadKind').value; let n = 0;
-  for (const f of files) {
+  const kind = $('uploadKind').value; let n = 0, i = 0;
+  for (const f of files) { i++;
     if (!/^(image\/(png|jpeg|webp)|application\/pdf)$/.test(f.type)) { toast(f.name + ': unsupported type', { err: true }); continue; }
-    $('uploadStatus').textContent = 'Uploading ' + f.name + '…';
+    $('uploadStatus').innerHTML = '<span class="spin sm"></span>Uploading ' + esc(f.name) + (files.length > 1 ? ' (' + i + ' of ' + files.length + ')' : '') + '…';
     try {
       let b64, mime = f.type;
       if (/^image/.test(f.type) && f.size > 2.5e6) { const r = await resizeImage(f, 2400); b64 = r.b64; mime = r.mime; }
       else { if (f.size > 10e6) throw new Error(f.name + ' exceeds 10 MB'); b64 = (await readDataURL(f)).split(',')[1]; }
-      await api('files.upload', { projectId: S.pid, name: f.name, mime, b64, kind }); n++;
+      await api('files.upload', { projectId: S.pid, name: f.name, mime, b64, kind }, 'Uploading ' + (files.length > 1 ? i + ' of ' + files.length + ': ' : '') + f.name + '…'); n++;
     } catch (e) { fail(e); }
   }
   $('uploadStatus').textContent = n + ' file(s) uploaded and saved to the project.'; $('uploads').value = '';

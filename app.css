@@ -144,3 +144,10 @@ body.touring #loadpill{bottom:auto;top:80px}
 
 /* overlays above Leaflet maps (Leaflet panes/controls use z-index 400–1000) */
 .leaflet-container{z-index:0}#tourBox{z-index:1100}#toasts{z-index:1200}#loadbar,#loadpill{z-index:1300}header{z-index:900}aside.open{z-index:950}
+
+/* v3.2.6: more visible working indicators */
+#loadbar{height:5px}#loadbar.on .lb-fill{box-shadow:0 0 12px var(--teal)}
+#loadpill{left:50%;right:auto;bottom:auto;top:78px;transform:translate(-50%,-8px);padding:10px 18px 10px 12px;font-size:14px;border-color:var(--teal);background:#0b2230}
+#loadpill.on{transform:translate(-50%,0)}body.touring #loadpill{top:78px}
+.pulse-focus{animation:pulsefocus 2.4s ease-out 1;border-radius:16px}
+@keyframes pulsefocus{0%,40%{box-shadow:0 0 0 3px var(--gold),0 0 30px rgba(255,201,121,.35)}100%{box-shadow:0 0 0 0 transparent}}

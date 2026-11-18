@@ -4,7 +4,7 @@
 <meta name="description" content="IntelliBuild AI: property intelligence, AI replacement-home concepts, smart takeoffs, cost estimating and contractor bidding in one workspace."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
-<link href="app.css?v=3.2.5" rel="stylesheet"/>
+<link href="app.css?v=3.2.6" rel="stylesheet"/>
 </head><body>
 <div id="boot" class="boot">Intelli<span>Build</span> AI™</div>
 
@@ -139,6 +139,7 @@
   <div class="two"><div class="card"><h2>Property location</h2><div class="map" id="map"></div><div class="small mt">© OpenStreetMap contributors · approximate location, not a boundary survey.</div>
     <div class="flex mt"><a class="link" target="_blank" rel="noopener" id="mapLink" href="https://www.openstreetmap.org">Open map ↗</a><a class="link" href="https://icare.fairfaxcounty.gov/ffxcare/Main/Home.aspx" target="_blank" rel="noopener">Fairfax assessor ↗</a><a class="link" href="https://www.fairfaxcounty.gov/maps/mar" target="_blank" rel="noopener">Fairfax parcel lookup ↗</a></div></div>
   <div class="card"><h2>Current home record</h2><div id="propRecord"></div><div class="note">Geocoding verifies location only. Characteristics must come from verified assessor records (County Records tab) or be entered and cited below.</div></div></div>
+  <div class="county-conflicts section"></div>
   <div class="section two"><div class="card"><h2>Confirm existing home details</h2><div class="two">
     <label>Existing floor area (sq ft)<input type="number" min="0" data-k="existingArea" placeholder="e.g. 2400"/></label>
     <label>Year built<input type="number" min="1700" max="2030" data-k="yearBuilt" placeholder="e.g. 1978"/></label>
@@ -167,7 +168,7 @@
 <!-- RECORDS -->
 <section class="tab" id="records"><div class="eyebrow">Official records · Pro</div><h1>Fairfax County Property Records</h1><p>Lookup by mapped location, then join county tax tables by parcel ID. Public records are evidence, not a survey or permit approval. Supports Fairfax County, Virginia.</p>
   <div class="hero"><p id="recordStatus" aria-live="polite">Geocode an address on Overview, then select “Find official records”.</p><div class="flex"><button class="btn pro-gate" id="lookupCounty">Find official records</button><button class="btn secondary edit-only" id="useCounty">Use all county values</button><button class="btn secondary" id="exportCounty">Export record evidence</button></div></div>
-  <div id="countyConflicts" class="section"></div>
+  <div id="countyConflicts" class="county-conflicts section"></div>
   <div class="two section"><div class="card"><h2>Matched parcel</h2><div id="countyParcel"><p>No county parcel loaded.</p></div></div><div class="card"><h2>Dwelling &amp; assessment</h2><div id="countyDwelling"><p>Awaiting lookup.</p></div><p class="small" id="countyProvenance"></p><div class="flex"><a class="intel-link" href="https://www.fairfaxcounty.gov/maps/gis-data" target="_blank" rel="noopener">Fairfax GIS data ↗</a><a class="intel-link" href="https://www.fairfaxcounty.gov/taxes/real-estate" target="_blank" rel="noopener">Fairfax tax records ↗</a></div></div></div>
   <div class="note">A geocoded point can fall near a parcel boundary. Review the returned PIN against the official county record before relying on it.</div>
 </section>
@@ -312,10 +313,10 @@
 <div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="modal-card"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="flex mt end"><button class="btn secondary" id="modalCancel">Cancel</button><button class="btn" id="modalOk">OK</button></div></div></div>
 <div id="toasts" aria-live="polite"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=3.2.5"></script>
-<script src="app.js?v=3.2.5"></script>
-<script src="pricing.js?v=3.2.5"></script>
-<script src="modules.js?v=3.2.5"></script>
-<script src="journey.js?v=3.2.5"></script>
-<script src="features.js?v=3.2.5"></script>
+<script src="config.js?v=3.2.6"></script>
+<script src="app.js?v=3.2.6"></script>
+<script src="pricing.js?v=3.2.6"></script>
+<script src="modules.js?v=3.2.6"></script>
+<script src="journey.js?v=3.2.6"></script>
+<script src="features.js?v=3.2.6"></script>
 </body></html>

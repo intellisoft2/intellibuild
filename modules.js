@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.5 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.2.6 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
@@ -156,7 +156,7 @@ async function lookupCounty() {
     keys.forEach((k, i) => { const rows = settled[i].status === 'fulfilled' ? settled[i].value : []; tables[k] = latest(rows); counts[k] = rows.length; if (settled[i].status === 'rejected') errors.push(k + ': ' + settled[i].reason.message); });
     p.county = { pin, parcelType: hit.type || (tables.parcel.LUC_DESC ? '' : ''), method: hit.method, methodLabel: hit.label, nearby: hit.others || [], matchedAddress: p.matched, retrievedAt: new Date().toISOString(), tables, counts, errors };
     if (hit.centroid && hit.method !== 'point') { p.lat = +hit.centroid.lat.toFixed(6); p.lon = +hit.centroid.lon.toFixed(6); p.geoSource = 'parcel'; }
-    const ap = applyCountyFields(false);
+    const ap = applyCountyFields(false); p.countyApplied = true;
     st.textContent = '✓ ' + hit.label + '. ' + keys.filter(k => counts[k]).length + ' of 4 assessment tables matched · ' + ap.filled + ' field(s) filled automatically' + (ap.conflicts.length ? ' · ' + ap.conflicts.length + ' differ from your entries (review below)' : '') + '.' + (errors.length ? ' Some sources failed.' : '');
     renderCounty(); renderPropRecord(); if (window.renderJourney) renderJourney();
   } catch (e) { st.textContent = 'County lookup unavailable: ' + e.message + '. No property values have been inferred.'; }
@@ -196,11 +196,13 @@ function applyCountyFields(overwrite) {
   fillAll(); compute(); markDirty(); renderCountyConflicts();
   return { filled: n, conflicts };
 }
-function renderCountyConflicts() {
-  const box = $('countyConflicts'); if (!box) return;
+function renderCountyConflicts() { qa('.county-conflicts').forEach(renderCountyConflictsInto); }
+function renderCountyConflictsInto(box) {
   const rows = countyFieldValues().filter(r => (S.P.countyConflicts || []).includes(r.k) && String(S.P[r.k]) !== String(r.county));
   if (!rows.length) { box.innerHTML = ''; return; }
   box.innerHTML = `<div class="note"><b>Your entries differ from the county record.</b> Choose which to keep:</div><div class="scroll"><table class="data"><thead><tr><th>Field</th><th class="num">Your entry</th><th class="num">Fairfax County</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${esc(S.P[r.k])}</td><td class="num"><b>${esc(r.county)}</b></td><td><div class="flex"><button class="btn sm" data-cc-use="${r.k}" ${S.canEdit ? '' : 'disabled'}>Use county</button><button class="btn sm secondary" data-cc-keep="${r.k}" ${S.canEdit ? '' : 'disabled'}>Keep mine</button></div></td></tr>`).join('')}</tbody></table></div>`;
+  box.querySelector('.note').insertAdjacentHTML('beforeend', ` <button class="btn sm" data-cc-all ${S.canEdit ? '' : 'disabled'}>Use county for all</button>`);
+  qa('[data-cc-all]', box).forEach(b => b.onclick = () => { rows.forEach(r => { S.P[r.k] = r.county; }); S.P.countyConflicts = []; fillAll(); compute(); markDirty(); renderCountyConflicts(); renderPropRecord(); toast('County values applied.'); if (window.renderJourney) renderJourney(); });
   qa('[data-cc-use]', box).forEach(b => b.onclick = () => { const r = rows.find(x => x.k === b.dataset.ccUse); S.P[r.k] = r.county; S.P.countyConflicts = S.P.countyConflicts.filter(k => k !== r.k); fillAll(); compute(); markDirty(); renderCountyConflicts(); renderPropRecord(); });
   qa('[data-cc-keep]', box).forEach(b => b.onclick = () => { S.P.countyConflicts = S.P.countyConflicts.filter(k => k !== b.dataset.ccKeep); markDirty(); renderCountyConflicts(); });
 }

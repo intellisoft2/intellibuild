@@ -1,19 +1,32 @@
-/* IntelliBuild AI™ v3.2.5 — guided project journey, Autopilot, and the narrated demo tour */
+/* IntelliBuild AI™ v3.2.6 — guided project journey, Autopilot, and the narrated demo tour */
 'use strict';
 
 /* ================================================================== journey */
 S.bidStats = { count: 0, awarded: 0 };
+const userDocs = () => S.files.filter(f => ['photo', 'survey', 'document'].includes(f.kind) || (f.kind === 'plan' && !/^concept-floor-plan/.test(f.name)));
 const JOURNEY = [
-  { id: 'locate', t: 'Locate property', tab: 'overview', done: () => !!(S.P.matched || S.P.sample), next: 'Enter the property address and click Find property.' },
-  { id: 'verify', t: 'Verify records', tab: 'records', done: () => !!(S.P.county || ['assessor', 'survey', 'county'].includes(S.P.source)), next: 'Pull official county records, or enter verified details from the assessor.' },
-  { id: 'existing', t: 'Existing home', tab: 'property', done: () => !!S.P.existingArea && S.files.some(f => f.kind === 'photo'), next: 'Confirm the existing house details and upload a few photos.' },
-  { id: 'design', t: 'Design', tab: 'design', done: () => !!S.P.designTouched, next: 'Choose the style, size, bedrooms and finish level of the new home.' },
-  { id: 'visualize', t: 'Visualize', tab: 'visualai', done: () => S.files.some(f => f.kind === 'render' || f.kind === 'plan'), next: 'Generate an AI concept from a photo, or save the concept floor plan.' },
-  { id: 'budget', t: 'Budget', tab: 'materials', done: () => !!S.P.priceReviewed, next: 'Review the materials & labor estimate and expected bid range.' },
-  { id: 'permits', t: 'Permits', tab: 'quality', done: () => Object.values(S.P.checklist || {}).some(x => x && (x.date || x.done)), next: 'Schedule permits, safety steps and inspections.' },
-  { id: 'bids', t: 'Collect bids', tab: 'bids', done: () => S.bidStats.count > 0, next: 'Invite contractors and collect bids.' },
-  { id: 'award', t: 'Award', tab: 'bids', done: () => S.bidStats.awarded > 0, next: 'Level the bids against the estimate and award the best value.' }
+  { id: 'locate', t: 'Locate property', tab: 'overview', sel: () => '#address', done: () => !!(S.P.matched || S.P.sample), next: () => 'Enter the property address and click Find property.' },
+  { id: 'verify', t: 'Verify records', tab: 'records', sel: () => '#lookupCounty', done: () => !!(S.P.county || ['assessor', 'survey', 'county'].includes(S.P.source)), next: () => 'Click Find official records to pull the Fairfax County record (or enter verified details).' },
+  { id: 'existing', t: 'Existing home', tab: 'property', sel: () => !S.P.existingArea ? '[data-k="existingArea"]' : '#uploads', done: () => !!S.P.existingArea && userDocs().length > 0,
+    next: () => { const miss = []; if (!S.P.existingArea) miss.push('enter the existing floor area'); if (!userDocs().length) miss.push('upload at least one photo, survey or plan of the existing house'); return miss.length ? 'Still needed: ' + miss.join(' and ') + '.' : 'Existing home documented.'; } },
+  { id: 'design', t: 'Design', tab: 'design', sel: () => '#designCards', done: () => !!S.P.designTouched, next: () => 'Choose a style (or change size, bedrooms or finish level) for the new home.' },
+  { id: 'visualize', t: 'Visualize', tab: 'visualai', sel: () => '#aiPhoto', done: () => S.files.some(f => f.kind === 'render' || f.kind === 'plan'), next: () => 'Generate an AI concept from a photo, or save the concept floor plan on Plans & Documents.' },
+  { id: 'budget', t: 'Budget', tab: 'materials', sel: () => '#mlBody', done: () => !!S.P.priceReviewed, next: () => 'Review the materials & labor estimate and expected bid range.' },
+  { id: 'permits', t: 'Permits', tab: 'quality', sel: () => '#checklist', done: () => Object.values(S.P.checklist || {}).some(x => x && (x.date || x.done)), next: () => 'Set target dates for permits and inspections (Autopilot can schedule them all).' },
+  { id: 'bids', t: 'Collect bids', tab: 'team', sel: () => '#inviteBox', done: () => S.bidStats.count > 0, next: () => 'Invite contractors by email, or log a bid you received on Contractor Bids.' },
+  { id: 'award', t: 'Award', tab: 'bids', sel: () => '#bidList', done: () => S.bidStats.awarded > 0, next: () => 'Compare bids against the estimate and click Award on the best value.' }
 ];
+/** Go: opens the step's page, scrolls to exactly what needs doing, highlights it and says what's missing. */
+function journeyGo(id) {
+  const j = JOURNEY.find(x => x.id === id); if (!j) return;
+  if (S.current !== j.tab) tab(j.tab);
+  setTimeout(() => {
+    const el = document.querySelector(j.sel()); const target = el && (el.closest('.card') || el.closest('.hero') || el);
+    if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); target.classList.remove('pulse-focus'); void target.offsetWidth; target.classList.add('pulse-focus'); setTimeout(() => target.classList.remove('pulse-focus'), 2600); }
+    if (el && /INPUT|SELECT|TEXTAREA/.test(el.tagName) && el.type !== 'file') setTimeout(() => el.focus({ preventScroll: true }), 400);
+    toast(j.done() ? j.t + ' is complete. ✓' : j.next());
+  }, S.current === j.tab ? 50 : 450);
+}
 function journeyState() { const st = JOURNEY.map(j => ({ j, done: !!(S.pid && j.done()) })); const cur = st.find(x => !x.done); return { st, cur, n: st.filter(x => x.done).length }; }
 async function refreshBidStats() {
   if (!S.pid) return;
@@ -26,15 +39,15 @@ function renderJourney() {
   const { st, cur, n } = journeyState();
   el.classList.remove('hidden');
   el.innerHTML = `<div class="jr-top"><div class="jr-title"><b>Project journey</b> <span class="small">${n} of ${JOURNEY.length} steps complete</span></div>
-    <div class="jr-next">${cur ? `<span class="small">Next:</span> <b>${esc(cur.j.next)}</b> <button class="btn sm" data-jgo="${cur.j.tab}">Go →</button>` : '<b>🎉 All steps complete — enjoy the build!</b>'}
+    <div class="jr-next">${cur ? `<span class="small">Next:</span> <b>${esc(cur.j.next())}</b> <button class="btn sm" data-jgo="${cur.j.id}">Go →</button>` : '<b>🎉 All steps complete — enjoy the build!</b>'}
     ${S.canEdit && !S.project.isDemo ? '<button class="btn sm secondary" id="autopilotBtn" title="Let IntelliBuild fill in everything it can">✨ Autopilot</button>' : ''}</div></div>
-    <ol class="jr-steps">${st.map((x, i) => `<li class="${x.done ? 'done' : ''} ${cur && cur.j.id === x.j.id ? 'cur' : ''} ${S.current === x.j.tab ? 'here' : ''}"><button data-jgo="${x.j.tab}" title="${esc(x.j.next)}"><span class="jr-dot">${x.done ? '✓' : i + 1}</span><span class="jr-lbl">${esc(x.j.t)}</span></button></li>`).join('')}</ol>`;
-  qa('[data-jgo]', el).forEach(b => b.onclick = () => tab(b.dataset.jgo));
+    <ol class="jr-steps">${st.map((x, i) => `<li class="${x.done ? 'done' : ''} ${cur && cur.j.id === x.j.id ? 'cur' : ''} ${S.current === x.j.tab ? 'here' : ''}"><button data-jgo="${x.j.id}" title="${esc(x.j.next())}"><span class="jr-dot">${x.done ? '✓' : i + 1}</span><span class="jr-lbl">${esc(x.j.t)}</span></button></li>`).join('')}</ol>`;
+  qa('[data-jgo]', el).forEach(b => b.onclick = () => journeyGo(b.dataset.jgo));
   if ($('autopilotBtn')) $('autopilotBtn').onclick = autopilot;
 }
 function journeyList() {
   const { st, cur } = journeyState();
-  return st.map((x, i) => `<div class="statrow jr-row ${x.done ? 'done' : ''}"><span><span class="jr-dot sm">${x.done ? '✓' : i + 1}</span> ${esc(x.j.t)}${!x.done && cur && cur.j.id === x.j.id ? ' <span class="badge warn">next</span>' : ''}</span><strong>${x.done ? '<span class="small">Done</span>' : `<button class="btn sm secondary" data-go="${x.j.tab}">Open</button>`}</strong></div>`).join('');
+  return st.map((x, i) => `<div class="statrow jr-row ${x.done ? 'done' : ''}"><span><span class="jr-dot sm">${x.done ? '✓' : i + 1}</span> ${esc(x.j.t)}${!x.done && cur && cur.j.id === x.j.id ? ' <span class="badge warn">next</span>' : ''}</span><strong>${x.done ? '<span class="small">Done</span>' : `<button class="btn sm secondary" data-jgo2="${x.j.id}">Open</button>`}</strong></div>`).join('');
 }
 
 /* ================================================================== autopilot */
@@ -183,11 +196,15 @@ function endTour() {
   const baseTab = tab;
   tab = function (name) { baseTab(name); renderJourney(); if (name === 'materials' && S.pid && S.canEdit && !S.P.priceReviewed) { S.P.priceReviewed = true; markDirty(); } };
   const baseApply = applyProject;
-  applyProject = function (d, isDemo) { baseApply(d, isDemo); S.bidStats = { count: 0, awarded: 0 }; refreshBidStats(); };
+  applyProject = function (d, isDemo) {
+    baseApply(d, isDemo); S.bidStats = { count: 0, awarded: 0 }; refreshBidStats();
+    if (S.canEdit && S.P.county && !S.P.countyApplied) { const r = applyCountyFields(false); S.P.countyApplied = true; markDirty();
+      if (r.filled || r.conflicts.length) toast('Fairfax County record applied: ' + r.filled + ' field(s) filled' + (r.conflicts.length ? ', ' + r.conflicts.length + ' differ from your entries.' : '.'), r.conflicts.length ? { action: 'Review', onAction: () => tab('property') } : {}); }
+  };
   const baseLoadFiles = loadFiles;
   loadFiles = async function (silent) { await baseLoadFiles(silent); renderJourney(); if (S.current === 'overview') renderOverview(); };
   const baseOverview = renderOverview;
-  renderOverview = function () { baseOverview(); if (S.pid) $('readiness').innerHTML = journeyList(); };
+  renderOverview = function () { baseOverview(); if (S.pid) { $('readiness').innerHTML = journeyList(); qa('[data-jgo2]', $('readiness')).forEach(b => b.onclick = () => journeyGo(b.dataset.jgo2)); } };
   if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = () => {};
   document.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.k; if (['area', 'stories', 'newBeds', 'newBaths', 'garage', 'finishTier', 'foundation'].includes(k) && S.canEdit && !S.P.designTouched) { S.P.designTouched = true; renderJourney(); } });
   document.addEventListener('keydown', e => { if (T.on && e.key === 'Escape') endTour(); });
