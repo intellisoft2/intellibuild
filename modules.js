@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.7 — feature modules (loaded after app.js) */
+/* IntelliBuild AI™ v3.2.8 — feature modules (loaded after app.js) */
 'use strict';
 
 /* ------------------------------------------------------------------ property intelligence */
@@ -40,11 +40,16 @@ function renderIntel() {
 }
 /** OpenStreetMap building outlines within 100 m: server proxy first, then public Overpass mirrors directly from the browser. */
 async function getFootprints(lat, lon) {
-  try { return (await api('property.footprints', { lat, lon })).elements; } catch (e) { /* fall through to browser */ }
-  const q = `[out:json][timeout:20];(way["building"](around:100,${lat},${lon}););out geom;`;
-  for (const m of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
-    try { const r = await fetch(m, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }); if (r.ok) return ((await r.json()).elements || []).filter(e => e.geometry && e.geometry.length > 2); } catch (e) { }
+  const q = `[out:json][timeout:8];(way["building"](around:100,${lat},${lon}););out geom;`, t0 = Date.now();
+  // Browser first (fast, CORS-enabled), each mirror capped at 6 s; then the server proxy once.
+  for (const m of ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']) {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 6000);
+    try { const r = await fetch(m, { method: 'POST', signal: ctl.signal, ibLabel: 'Finding nearby buildings…', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      if (r.ok) { clearTimeout(timer); return ((await r.json()).elements || []).filter(e => e.geometry && e.geometry.length > 2); } }
+    catch (e) { ibLog('warn', 'ext', 'Building outlines: ' + m.split('/')[2] + (e.name === 'AbortError' ? ' timed out after 6 s' : ' unreachable')); }
+    finally { clearTimeout(timer); }
   }
+  if (Date.now() - t0 < 15000) { try { return (await api('property.footprints', { lat, lon })).elements; } catch (e) { } }
   throw new Error('the OpenStreetMap building service is busy right now');
 }
 async function findFootprints() {
@@ -656,6 +661,8 @@ function wire() {
   $('sendInvite').onclick = async () => {
     const emails = [...new Set($('invEmail').value.split(/[\s,;]+/).map(x => x.trim()).filter(x => x.includes('@')))];
     if (!emails.length) return toast('Enter at least one email address.', { err: true });
+    const self = S.user && emails.find(x => x.toLowerCase() === S.user.email.toLowerCase());
+    if (self) { toast('You already own this project — invite your contractors, architect or co-owner instead. To preview the contractor view, invite a second email address you own.', { ms: 9000 }); if (emails.length === 1) return; emails.splice(emails.indexOf(self), 1); }
     const b = $('sendInvite'); busy(b, true, 'Sending ' + emails.length + '…'); const out = [];
     for (const em of emails) { try { const r = await api('members.invite', { projectId: S.pid, email: em, role: $('invRole').value }); out.push(`✓ ${esc(em)} — ${r.emailed ? 'emailed' : 'email failed, share the link'} · <a class="link" href="${esc(r.inviteLink)}" title="Copy and share by text if needed">invite link</a>`); } catch (e) { out.push(`✗ ${esc(em)} — ${esc(e.message)}`); if (e.code === 'upgrade') break; } }
     $('inviteResult').innerHTML = out.join('<br/>'); $('invEmail').value = ''; busy(b, false); loadTeam();

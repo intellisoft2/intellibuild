@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.7 — guided project journey, Autopilot, and the narrated demo tour */
+/* IntelliBuild AI™ v3.2.8 — guided project journey, Autopilot, and the narrated demo tour */
 'use strict';
 
 /* ================================================================== journey */
@@ -88,9 +88,12 @@ async function autopilot() {
   document.body.append(ov);
   const mark = (id, state, note) => { const li = $('ap_' + id); li.className = state; li.querySelector('.ap-ico').textContent = { run: '◌', ok: '✓', skip: '–', err: '!' }[state]; li.querySelector('.ap-note').textContent = note || ''; };
   ibLog('info', 'autopilot', 'Autopilot started for ' + (addr || 'sample property'));
+  const LIMIT = { locate: 20000, map: 12000, records: 45000, plan: 25000 };
   const run = async (id, fn) => { mark(id, 'run'); const label = (steps.find(x => x[0] === id) || [, id])[1];
-    try { const r = await fn(); mark(id, r && r.skip ? 'skip' : 'ok', r && r.note); ibLog(r && r.skip ? 'warn' : 'info', 'autopilot', label + (r && r.skip ? ' — skipped' : ' ✓') + (r && r.note ? ': ' + r.note : '')); }
-    catch (e) { mark(id, 'err', e.message); ibLog('error', 'autopilot', label + ' ✗ ' + e.message); } };
+    const cap = LIMIT[id] || 15000; let timer;
+    const timeout = new Promise(res => { timer = setTimeout(() => res({ skip: 1, timedOut: 1, note: 'Taking too long — skipped so Autopilot can continue; you can retry it later' }), cap); });
+    try { const r = await Promise.race([fn(), timeout]); clearTimeout(timer); if (r && r.timedOut) ibLog('warn', 'autopilot', label + ' timed out after ' + cap / 1000 + ' s'); mark(id, r && r.skip ? 'skip' : 'ok', r && r.note); ibLog(r && r.skip ? 'warn' : 'info', 'autopilot', label + (r && r.skip ? ' — skipped' : ' ✓') + (r && r.note ? ': ' + r.note : '')); }
+    catch (e) { clearTimeout(timer); mark(id, 'err', e.message); ibLog('error', 'autopilot', label + ' ✗ ' + e.message); } };
   await run('locate', async () => {
     if (S.P.sample) return { skip: 1, note: 'Sample property' };
     if (S.P.matched) return { note: S.P.matched };
@@ -99,9 +102,11 @@ async function autopilot() {
   });
   await run('map', async () => {
     if (S.P.lat === null || S.P.lat === '') return { skip: 1, note: 'Needs a located address' };
-    let els;
-    try { els = await getFootprints(S.P.lat, S.P.lon); } catch (e) { return { skip: 1, note: 'Optional — map service busy; retry later on Property Intelligence' }; }
-    S.P.intel = { buildingCount: els.length, lastChecked: new Date().toISOString() }; return { note: els.length + ' mapped buildings within 100 m' };
+    // Optional and slow at times: run it in the background so the remaining steps don't wait.
+    const lat = S.P.lat, lon = S.P.lon, pid = S.pid;
+    getFootprints(lat, lon).then(els => { if (S.pid !== pid) return; S.P.intel = { buildingCount: els.length, lastChecked: new Date().toISOString() }; markDirty(); ibLog('info', 'autopilot', 'Nearby buildings mapped in background: ' + els.length); })
+      .catch(() => ibLog('warn', 'autopilot', 'Nearby buildings: map service busy — retry on Property Intelligence'));
+    return { note: 'Running in the background — results appear on Property Intelligence' };
   });
   await run('records', async () => {
     if (S.P.county) { const r = applyCountyFields(false); return { note: 'PIN ' + S.P.county.pin + ' · ' + r.filled + ' field(s) filled' + (r.conflicts.length ? ' · ' + r.conflicts.length + ' differ from your entries — review on County Records' : '') }; }

@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.7 — Materials & Labor price book, Permits/Safety/Quality, Plans & Documents, key tests */
+/* IntelliBuild AI™ v3.2.8 — Materials & Labor price book, Permits/Safety/Quality, Plans & Documents, key tests */
 'use strict';
 
 /* ================================================================== price book */
