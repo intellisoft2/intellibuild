@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>IntelliBuild AI™ — Knockdown-to-Rebuild Planning Platform</title>
+<meta name="description" content="IntelliBuild AI: property intelligence, AI replacement-home concepts, smart takeoffs, cost estimating and contractor bidding in one workspace."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
+<link href="app.css?v=3.0.1" rel="stylesheet"/>
+</head><body>
+<div id="boot" class="boot">Intelli<span>Build</span> AI™</div>
+
+<!-- ============ PUBLIC / AUTH ============ -->
+<div id="authView" class="hidden">
+  <header><div class="logo">Intelli<span>Build</span> AI™</div><div class="flex"><a class="link" href="#pricing" id="toPricing">Pricing</a><button class="btn secondary sm" id="exploreDemo">Explore live demo</button></div></header>
+  <section class="landing">
+    <div class="landing-copy">
+      <div class="eyebrow">Property intelligence → AI design → Construction</div>
+      <h1>Plan your knockdown-and-rebuild with confidence.</h1>
+      <p>One workspace for homeowners, builders and architects: verify the property, generate AI concepts of the new home, estimate costs and quantities, then invite contractors to bid and collaborate.</p>
+      <div class="feature-list">
+        <div>◉ Census geocoding, satellite context and Fairfax County official records</div>
+        <div>✦ AI replacement-home renders from a photo of the existing house</div>
+        <div>▤ Smart takeoffs, cost estimator, scenarios and feasibility reports</div>
+        <div>♧ Contractor portal: invites, bids, tasks and project messaging</div>
+      </div>
+      <p class="small">Your projects, photos and renders are saved securely to your account and available on any device.</p>
+    </div>
+    <div class="card auth-card">
+      <div class="seg" id="authTabs"><button data-mode="login" class="on">Sign in</button><button data-mode="signup">Create account</button></div>
+      <div id="inviteNote" class="note hidden"></div>
+      <form id="loginForm" class="auth-form">
+        <label>Email<input name="email" type="email" autocomplete="email" required/></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required/></label>
+        <button class="btn wide" type="submit">Sign in</button>
+        <a class="link small" href="#" id="toForgot">Forgot password?</a>
+      </form>
+      <form id="signupForm" class="auth-form hidden">
+        <label>Full name<input name="name" required autocomplete="name"/></label>
+        <label>Email<input name="email" type="email" required autocomplete="email"/></label>
+        <label>I am a<select name="accountType"><option value="homeowner">Homeowner</option><option value="contractor">Contractor / builder</option><option value="architect">Architect / designer</option><option value="developer">Developer / investor</option></select></label>
+        <label>Company (optional)<input name="company" autocomplete="organization"/></label>
+        <label>Password (8+ characters)<input name="password" type="password" minlength="8" required autocomplete="new-password"/></label>
+        <button class="btn wide" type="submit">Create free account</button>
+        <p class="small">Free plan includes 2 projects and 5 AI credits. By creating an account you agree to the terms of service.</p>
+      </form>
+      <form id="forgotForm" class="auth-form hidden">
+        <p class="small">Enter your account email and we will send a reset link.</p>
+        <label>Email<input name="email" type="email" required/></label>
+        <button class="btn wide" type="submit">Send reset link</button>
+        <a class="link small" href="#" data-auth="login">Back to sign in</a>
+      </form>
+      <form id="resetForm" class="auth-form hidden">
+        <p class="small">Choose a new password.</p>
+        <label>New password<input name="password" type="password" minlength="8" required autocomplete="new-password"/></label>
+        <button class="btn wide" type="submit">Update password</button>
+      </form>
+      <p id="authMsg" class="status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+  <section class="landing-pricing" id="pricing"><h2>Simple pricing</h2><div class="grid plans" id="publicPlans"></div><div id="publicPacks"></div></section>
+  <div class="foot center">© Intellisoft Technologies Inc. · IntelliBuild AI™ v<span class="ver"></span> · All property, design, cost and permitting outputs require independent professional verification.</div>
+</div>
+
+<!-- ============ APPLICATION ============ -->
+<div id="appView" class="hidden">
+<header>
+  <div class="flex center-y"><button class="iconbtn" id="menuToggle" aria-label="Menu">☰</button><div class="logo">Intelli<span>Build</span> AI™</div></div>
+  <div class="flex center-y hdr-right">
+    <select id="projectSwitch" aria-label="Current project"></select>
+    <span id="saveState" class="small"></span>
+    <button class="chip" id="creditBadge" title="AI credits">✦ <b id="creditCount">0</b> credits</button>
+    <button class="chip" id="userBtn"></button>
+  </div>
+</header>
+<div id="banner" class="banner hidden"></div>
+<main>
+<aside id="menu">
+  <div class="navh">Workspace</div>
+  <button class="nav" data-tab="projects">▦ Projects</button>
+  <button class="nav" data-tab="team" data-proj>♧ Team &amp; Messages</button>
+  <button class="nav" data-tab="files" data-proj>▧ Files &amp; Renders</button>
+  <div class="navh">Property</div>
+  <button class="nav" data-tab="overview" data-proj>◈ Overview</button>
+  <button class="nav" data-tab="property" data-proj>⌂ Existing Property</button>
+  <button class="nav" data-tab="intelligence" data-proj>◉ Property Intelligence</button>
+  <button class="nav" data-tab="records" data-proj>▣ County Records <i class="pro">PRO</i></button>
+  <div class="navh">Design</div>
+  <button class="nav" data-tab="visualai" data-proj>✦ AI Visual Studio</button>
+  <button class="nav" data-tab="conceptlab" data-proj>✧ Concept Lab</button>
+  <button class="nav" data-tab="design" data-proj>◇ Design Studio</button>
+  <div class="navh">Cost &amp; build</div>
+  <button class="nav" data-tab="budget" data-proj>＄ Cost Estimator</button>
+  <button class="nav" data-tab="takeoffs" data-proj>▤ Smart Takeoffs</button>
+  <button class="nav" data-tab="materials" data-proj>▦ Materials &amp; Labor</button>
+  <button class="nav" data-tab="schedule" data-proj>◷ Project Timeline</button>
+  <button class="nav" data-tab="quality" data-proj>✓ Quality &amp; Permits</button>
+  <div class="navh">Decide</div>
+  <button class="nav" data-tab="feasibility" data-proj>◎ Feasibility Report <i class="pro">PRO</i></button>
+  <button class="nav" data-tab="compare" data-proj>⇄ Project Scenarios <i class="pro">PRO</i></button>
+  <button class="nav" data-tab="bids" data-proj>⚖ Contractor Bids</button>
+  <div class="navh" data-auth-only>Account</div>
+  <button class="nav" data-tab="billing" data-auth-only>◈ Plans, Billing &amp; Credits</button>
+  <button class="nav" data-tab="account" data-auth-only>☺ Account</button>
+  <button class="nav admin-only hidden" data-tab="admin">▥ Admin Console</button>
+</aside>
+<div class="content">
+
+<!-- PROJECTS -->
+<section class="tab" id="projects">
+  <div class="eyebrow">Workspace</div><h1>Your projects</h1>
+  <p id="entLine" class="small"></p>
+  <div id="inviteList"></div>
+  <div class="flex"><button class="btn" id="newProject">＋ New project</button><button class="btn secondary" id="copyDemo">Copy sample project to my workspace</button><button class="btn secondary" id="openDemo">View live sample</button></div>
+  <div class="section grid" id="projectCards"></div>
+  <div id="guestCta" class="hero hidden"><h2>Save your own projects</h2><p>Create a free account to store property evidence, upload photos and plans, generate AI concepts and invite contractors.</p><button class="btn" id="guestSignup">Create free account</button></div>
+</section>
+
+<!-- OVERVIEW -->
+<section class="tab" id="overview">
+  <div class="hero"><div class="eyebrow">Property intelligence → Design → Construction</div><h1 id="ovTitle">Build what’s next.</h1>
+    <p>Enter the current home address to begin. Explore public property records, upload plans, compare design directions and develop a preliminary construction roadmap.</p>
+    <div class="search"><input aria-label="Property address" id="address" data-k="address" placeholder="Enter full U.S. street address, city, state, ZIP"/><button class="btn edit-only" id="lookup">Find property →</button></div>
+    <p class="small" id="lookupStatus" aria-live="polite">U.S. Census address geocoding</p></div>
+  <div class="grid"><div class="card"><div class="small">Property</div><div class="metric" id="mProperty">Not located</div></div><div class="card"><div class="small">Proposed new home</div><div class="metric" id="mArea">—</div></div><div class="card"><div class="small">Preliminary budget</div><div class="metric" id="mBudget">—</div></div><div class="card"><div class="small">Planning checklist</div><div class="metric" id="mTasks">0%</div></div></div>
+  <div class="section two"><div class="card"><h2>Project details</h2><label>Project name<input id="projName" class="edit-only"/></label><label>Private owner notes (hidden from contractors)<textarea data-k="privateNotes" rows="3" placeholder="Budget ceiling, lender notes, decisions…"></textarea></label><div class="flex"><button class="btn secondary" data-go="property">Property profile</button><button class="btn secondary" data-go="design">Explore designs</button><button class="btn secondary" data-go="team">Invite contractors</button></div></div>
+  <div class="card"><h2>Project readiness</h2><div id="readiness"></div></div></div>
+</section>
+
+<!-- PROPERTY -->
+<section class="tab" id="property"><div class="eyebrow">Step 01 · Discover</div><h1>Existing Property</h1><p id="fullAddress">Search for an address on Overview to begin.</p>
+  <div class="two"><div class="card"><h2>Property location</h2><div class="map" id="map"></div><div class="small mt">© OpenStreetMap contributors · approximate location, not a boundary survey.</div>
+    <div class="flex mt"><a class="link" target="_blank" rel="noopener" id="mapLink" href="https://www.openstreetmap.org">Open map ↗</a><a class="link" href="https://icare.fairfaxcounty.gov/ffxcare/Main/Home.aspx" target="_blank" rel="noopener">Fairfax assessor ↗</a><a class="link" href="https://www.fairfaxcounty.gov/maps/mar" target="_blank" rel="noopener">Fairfax parcel lookup ↗</a></div></div>
+  <div class="card"><h2>Current home record</h2><div id="propRecord"></div><div class="note">Geocoding verifies location only. Characteristics must come from verified assessor records (County Records tab) or be entered and cited below.</div></div></div>
+  <div class="section two"><div class="card"><h2>Confirm existing home details</h2><div class="two">
+    <label>Existing floor area (sq ft)<input type="number" min="0" data-k="existingArea" placeholder="e.g. 2400"/></label>
+    <label>Year built<input type="number" min="1700" max="2030" data-k="yearBuilt" placeholder="e.g. 1978"/></label>
+    <label>Bedrooms<input type="number" min="0" data-k="bedrooms"/></label>
+    <label>Bathrooms<input type="number" min="0" step="0.5" data-k="bathrooms"/></label>
+    <label>Lot size (sq ft)<input type="number" min="0" data-k="lotArea"/></label>
+    <label>Parcel ID (if known)<input data-k="parcelInput" placeholder="From assessor record"/></label></div>
+    <p class="small">Changes save automatically to your project.</p></div>
+  <div class="card"><h2>Photos, floor plans &amp; surveys</h2><div class="upload edit-zone"><div class="big">▧</div><p>Upload photos of the existing house, floor plans, surveys and site documents (JPG, PNG, WebP, PDF · 10 MB each).</p>
+    <select id="uploadKind" class="inline"><option value="photo">Photo</option><option value="plan">Floor plan</option><option value="survey">Survey</option><option value="document">Other document</option></select>
+    <input type="file" id="uploads" multiple accept="image/png,image/jpeg,image/webp,application/pdf"/></div>
+    <p class="small" id="uploadStatus"></p><div class="thumbs" id="thumbs"></div></div></div>
+</section>
+
+<!-- INTELLIGENCE -->
+<section class="tab" id="intelligence"><div class="eyebrow">Property intelligence</div><h1>Know the property before you build.</h1><p>Satellite imagery, nearby mapped structures, jurisdiction links and an evidence-based property profile. Public map features are not a legal parcel survey or assessor record.</p>
+  <div class="grid"><div class="card"><div class="small">Address status</div><div class="metric" id="intelAddress">—</div></div><div class="card"><div class="small">Mapped structures</div><div class="metric" id="intelBuildings">—</div></div><div class="card"><div class="small">Jurisdiction</div><div class="metric" id="intelJurisdiction">—</div></div><div class="card"><div class="small">Data confidence</div><div class="metric" id="intelConfidence">—</div></div></div>
+  <div class="two section"><div class="card"><h2>Satellite property context</h2><div class="map" id="aerialMap" style="height:390px"></div><div class="flex mt"><button class="btn secondary" id="refreshFootprints">Find nearby mapped buildings</button><button class="btn secondary" id="toggleImagery">Switch map layer</button></div><div class="note" id="footprintStatus">Search an address first.</div><p class="small">Imagery: Esri World Imagery. Footprints: OpenStreetMap contributors (may be incomplete).</p></div>
+  <div class="card"><h2>Property evidence &amp; verification</h2><div id="intelEvidence"></div><h3 class="mt">Public records</h3><div class="flex" id="intelLinks"></div><button class="btn mt" id="exportEvidence">Export property evidence JSON</button></div></div>
+  <div class="card section"><h2>Architectural concept brief</h2><p>Build a brief from your design, floor area, site and priorities. The template brief is free; the AI-written brief uses <b><span class="cc-brief">1</span> credit</b>.</p>
+    <div class="two"><div><label>Design priorities<textarea data-k="priorities" rows="4" placeholder="e.g. 5 bedrooms, home office, 3-car garage, aging-in-place, solar-ready roof"></textarea></label><label>Architectural constraints<textarea data-k="designConstraints" rows="3" placeholder="e.g. preserve mature trees, design review"></textarea></label>
+      <div class="flex"><button class="btn secondary edit-only" id="generateBrief">Generate template brief</button><button class="btn edit-only" id="aiBrief">✦ AI-written brief</button><button class="btn secondary" id="copyBrief">Copy</button></div></div>
+    <div><label>Brief<textarea data-k="brief" id="conceptBrief" rows="16" placeholder="Generate a brief to see the result"></textarea></label></div></div></div>
+</section>
+
+<!-- RECORDS -->
+<section class="tab" id="records"><div class="eyebrow">Official records · Pro</div><h1>Fairfax County Property Records</h1><p>Lookup by mapped location, then join county tax tables by parcel ID. Public records are evidence, not a survey or permit approval. Supports Fairfax County, Virginia.</p>
+  <div class="hero"><p id="recordStatus" aria-live="polite">Geocode an address on Overview, then select “Find official records”.</p><div class="flex"><button class="btn pro-gate" id="lookupCounty">Find official records</button><button class="btn secondary edit-only" id="useCounty">Apply verified fields to project</button><button class="btn secondary" id="exportCounty">Export record evidence</button></div></div>
+  <div class="two section"><div class="card"><h2>Matched parcel</h2><div id="countyParcel"><p>No county parcel loaded.</p></div></div><div class="card"><h2>Dwelling &amp; assessment</h2><div id="countyDwelling"><p>Awaiting lookup.</p></div><p class="small" id="countyProvenance"></p><div class="flex"><a class="intel-link" href="https://www.fairfaxcounty.gov/maps/gis-data" target="_blank" rel="noopener">Fairfax GIS data ↗</a><a class="intel-link" href="https://www.fairfaxcounty.gov/taxes/real-estate" target="_blank" rel="noopener">Fairfax tax records ↗</a></div></div></div>
+  <div class="note">A geocoded point can fall near a parcel boundary. Review the returned PIN against the official county record before relying on it.</div>
+</section>
+
+<!-- AI VISUAL -->
+<section class="tab" id="visualai"><div class="eyebrow">AI Visual Studio · paid credits</div><h1>AI Replacement-Home Concepts</h1><p>Upload a photo of the existing home and generate photorealistic <b>conceptual</b> replacement-home images. Renders are saved to the project and shared with your team. Output is an artistic visualization, not a buildable drawing.</p>
+  <div class="two"><div class="card"><h2>1 · Existing home</h2><div class="upload"><input id="aiPhoto" type="file" accept="image/png,image/jpeg,image/webp"/><p class="small">JPG / PNG / WebP. Resized in your browser before upload.</p></div><img id="aiOriginal" alt="Existing home" class="hidden preview"/>
+    <h2 class="mt">2 · Brief</h2>
+    <label>Architecture<select data-k="aiStyle"><option value="modern farmhouse">Modern farmhouse</option><option value="contemporary">Contemporary</option><option value="craftsman">Craftsman</option><option value="traditional colonial">Traditional colonial</option><option value="transitional">Transitional</option><option value="mid-century modern">Mid-century modern</option><option value="mediterranean">Mediterranean</option></select></label>
+    <label>Finish tier<select data-k="aiFinish"><option>Standard</option><option>Premium</option><option>Luxury</option></select></label>
+    <label>Render quality<select id="aiQuality"><option value="standard">Standard</option><option value="hd">High detail</option></select></label>
+    <label>Instructions<textarea data-k="aiNotes" rows="4" placeholder="Two stories, 4 bedrooms, 2-car garage, white brick, dark window frames, front porch."></textarea></label>
+    <label class="check"><input id="aiConsent" type="checkbox"/> I have permission to upload this photograph and understand it will be processed by an external AI service.</label>
+    <div class="flex"><button class="btn" id="aiGenerate">✦ Generate concept · <span id="aiCost">2</span> credits</button><button class="btn secondary" id="aiBuy">Buy credits</button></div>
+    <p class="status" id="aiStatus" role="status" aria-live="polite"></p></div>
+  <div class="card"><h2>3 · Concept gallery</h2><div id="aiGallery"><div class="upload"><p>No concepts generated yet.</p></div></div><div class="note">Visuals can be inaccurate about setbacks, roof geometry, structure and site. Validate with qualified professionals.</div><div class="flex mt"><button class="btn secondary edit-only" id="aiToDesign">Send style to Design Studio</button></div></div></div>
+</section>
+
+<!-- TAKEOFFS -->
+<section class="tab" id="takeoffs"><div class="eyebrow">Quantity-based budget planning</div><h1>Smart Materials &amp; Labor Takeoffs</h1><p>Editable preliminary quantity schedule from building area and planning assumptions — <b>not</b> a measured takeoff from construction drawings. Replace rates with supplier prices and subcontractor quotes.</p>
+  <div class="two"><div class="card"><h2>Takeoff assumptions</h2>
+    <label>Finished floor area (sq ft)<input id="takeArea" type="number" min="300" max="30000"/></label>
+    <label>Stories<select id="takeStories"><option value="1">1 story</option><option value="2">2 stories</option><option value="3">3 stories</option></select></label>
+    <label>Building shape factor<select id="takeShape"><option value="1">Simple rectangle</option><option value="1.15">Moderate complexity</option><option value="1.35">Complex footprint</option></select></label>
+    <label>Waste allowance (%)<input id="takeWaste" type="number" min="0" max="30"/></label>
+    <div class="flex"><button class="btn" id="takeCalc">Recalculate takeoff</button><button class="btn secondary" id="takeCSV">Export CSV</button><button class="btn secondary" id="takeSync">Use Design Studio area</button></div>
+    <p class="small">Footprint = area ÷ stories; roof uses a conceptual pitch multiplier; framing and MEP are allowances.</p></div>
+  <div class="card"><h2>Preliminary takeoff budget</h2><div id="takeSummary" class="metric">—</div><p class="small" id="takeBreakdown"></p></div></div>
+  <div class="card section"><h2>Editable quantities, unit rates and allowances</h2><div class="scroll"><table class="data"><thead><tr><th>Package</th><th>Quantity</th><th>Unit</th><th>Unit rate ($)</th><th>Extended ($)</th><th>Basis</th></tr></thead><tbody id="takeRows"></tbody></table></div></div>
+</section>
+
+<!-- CONCEPT LAB -->
+<section class="tab" id="conceptlab"><div class="eyebrow">Design visualization</div><h1>Before / After Concept Lab</h1><p>Explore an illustrative massing overlay on a photo of the existing house. A browser sketch — <b>not</b> an AI render or measured elevation. Free and unlimited.</p>
+  <div class="two"><div class="card"><h2>Existing home photograph</h2><label>JPG / PNG / WebP<input type="file" id="conceptPhoto" accept="image/png,image/jpeg,image/webp"/></label><div class="flex"><button class="btn secondary" id="clearConcept">Remove photo</button><button class="btn secondary" id="saveConcept">Save PNG</button></div>
+    <label>Concept style<select id="conceptStyle"><option value="contemporary">Contemporary</option><option value="farmhouse">Modern farmhouse</option><option value="traditional">Traditional</option></select></label>
+    <label>Overlay opacity <span id="opacityLabel"></span><input id="conceptOpacity" type="range" min="0" max="100" value="75"/></label>
+    <label>Building width <span id="widthLabel"></span><input id="conceptWidth" type="range" min="35" max="90" value="62"/></label>
+    <label>Vertical placement <span id="heightLabel"></span><input id="conceptHeight" type="range" min="25" max="80" value="58"/></label></div>
+  <div class="card"><h2>Visual preview</h2><canvas id="conceptCanvas" width="1000" height="640"></canvas><button class="btn mt edit-only" id="conceptToBrief">Send concept choices to design brief</button></div></div>
+</section>
+
+<!-- DESIGN -->
+<section class="tab" id="design"><div class="eyebrow">Step 02 · Imagine</div><h1>Design Studio</h1><p>Choose an architectural direction and specify the new home. Area changes flow through the budget, takeoffs and scenarios.</p>
+  <div class="designs" id="designCards"></div>
+  <div class="section card"><h2>New home requirements</h2><div class="two">
+    <label>Target floor area <b id="areaLabel"></b><input type="range" min="1200" max="10000" step="100" data-k="area"/></label>
+    <label>Stories<select data-k="stories"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+    <label>Bedrooms<select data-k="newBeds"><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></label>
+    <label>Garage spaces<select data-k="garage"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option></select></label></div></div>
+</section>
+
+<!-- BUDGET -->
+<section class="tab" id="budget"><div class="eyebrow">Step 03 · Estimate</div><h1>Construction Cost Estimator</h1><p>Editable planning assumptions. Replace with local contractor bids — bids entered on Contractor Bids are compared against this estimate.</p>
+  <div class="two"><div class="card"><h2>Cost assumptions</h2>
+    <label>Construction cost per sq ft <b id="rateLabel"></b><input type="range" min="150" max="650" step="5" data-k="rate"/></label>
+    <label>Demolition allowance ($)<input type="number" min="0" data-k="demo"/></label>
+    <label>Sitework / utilities allowance ($)<input type="number" min="0" data-k="site"/></label>
+    <label>Soft costs (% of construction)<input type="number" min="0" max="100" data-k="soft"/></label>
+    <label>Contingency (%)<input type="number" min="0" max="100" data-k="cont"/></label>
+    <button class="btn secondary" id="exportProject">Export project JSON</button></div>
+  <div class="card"><h2>Preliminary project budget</h2><div id="costRows"></div><div class="statrow mt"><strong>Estimated total</strong><strong id="grandTotal" class="total"></strong></div><div class="note">The construction rate is treated as an inclusive allowance (labor + materials). Excludes land, financing, temporary housing and exceptional site conditions.</div></div></div>
+</section>
+
+<section class="tab" id="materials"><div class="eyebrow">Step 04 · Procure</div><h1>Materials &amp; Labor</h1><p>Trade-based planning structure. Quantities are conceptual planning ranges, not engineering takeoffs.</p><div class="card"><h2>Preliminary material planning</h2><div id="materialRows"></div></div><div class="section card"><h2>Trade packages</h2><div id="laborRows"></div></div></section>
+<section class="tab" id="schedule"><div class="eyebrow">Step 05 · Deliver</div><h1>Project Timeline</h1><p>Illustrative sequential planning windows. Permit processing, weather and trade availability can change duration.</p><div class="card" id="scheduleRows"></div></section>
+<section class="tab" id="quality"><div class="eyebrow">Step 06 · Assure</div><h1>Permits, Safety &amp; Quality</h1><p>Checking a box is an internal acknowledgment shared with your team — not an official approval or inspection.</p><div class="card"><h2>Preconstruction and inspection checklist</h2><div id="checklist"></div><div class="section"><div class="progress"><div id="checkProgress"></div></div><p class="small" id="checkText"></p></div></div></section>
+
+<!-- FEASIBILITY -->
+<section class="tab" id="feasibility"><div class="eyebrow">Redevelopment intelligence · Pro</div><h1>Feasibility report</h1><p class="small">Preliminary redevelopment brief with transparent source confidence. Zoning, lot coverage and buildability are not certified.</p>
+  <div class="section two"><div class="card"><h2>Property record &amp; evidence</h2><div id="evidence"></div><div class="flex"><a class="btn secondary" href="https://www.fairfaxcounty.gov/taxes/real-estate" target="_blank" rel="noopener">Fairfax property search ↗</a><a class="btn secondary" href="https://www.fairfaxcounty.gov/planning-development/zoning" target="_blank" rel="noopener">Fairfax zoning ↗</a></div></div>
+  <div class="card"><h2>Site constraints &amp; assumptions</h2><label>Lot area (sq ft)<input type="number" min="0" data-k="lotArea"/></label><label>Zoning district<input data-k="zone" placeholder="Unverified until checked"/></label><label>Setbacks / easements<textarea data-k="constraints" rows="3" placeholder="Survey and zoning review required"></textarea></label>
+    <label>Data source<select data-k="source"><option value="owner">Owner supplied (unverified)</option><option value="assessor">Assessor verified manually</option><option value="survey">Professional survey</option><option value="county">Fairfax County public GIS</option></select></label></div></div>
+  <div class="card printable"><h2>Feasibility summary</h2><div id="feasSummary"></div><div class="flex noprint"><button class="btn pro-gate" id="printFeas">Print / save as PDF</button><button class="btn secondary pro-gate" id="exportFeas">Export report JSON</button></div></div>
+</section>
+
+<!-- COMPARE -->
+<section class="tab" id="compare"><div class="eyebrow">Design-to-cost intelligence · Pro</div><h1>Compare redevelopment options</h1><p class="small">Illustrative concepts with editable rates — financial models, not architectural approvals.</p>
+  <div id="compareBody"><div class="card"><div class="two"><label>New build cost / sq ft ($)<input type="number" min="50" data-k="compareRate"/></label><label>Renovation cost / sq ft ($)<input type="number" min="25" data-k="renoRate"/></label></div></div>
+  <div class="grid section" id="compareCards"></div><div class="card"><h2>Scenario comparison</h2><div id="scenarioTable"></div><p class="small">Includes 15% soft costs and 12% contingency; demolition from the Cost Estimator. Excludes land, financing and unusual site conditions.</p></div></div>
+</section>
+
+<!-- BIDS -->
+<section class="tab" id="bids"><div class="eyebrow">Contractor collaboration</div><h1>Contractor bids</h1><p class="small" id="bidIntro">Invite contractors from Team &amp; Messages — they submit bids here directly. Owners can also log bids received offline.</p>
+  <div class="grid" id="bidStats"></div>
+  <div class="two section"><div class="card"><h2 id="bidFormTitle">Submit a bid</h2><input type="hidden" id="bidId"/>
+    <div class="two"><label>Contractor / firm<input id="bidName" placeholder="Company name"/></label><label>Quoted price ($)<input id="bidPrice" type="number" min="0" placeholder="950000"/></label><label>Duration (months)<input id="bidMonths" type="number" min="1" placeholder="14"/></label><label>Exclusions<input id="bidExcl" placeholder="e.g. Landscaping, appliances"/></label></div>
+    <label>Scope summary<textarea id="bidScope" rows="3" placeholder="Demolition, foundation, framing, MEP, finishes…"></textarea></label>
+    <div class="flex"><button class="btn bid-gate" id="addBid">Submit bid</button><button class="btn secondary hidden" id="cancelBidEdit">Cancel edit</button></div></div>
+  <div class="card"><h2>How bids compare</h2><div id="bidChart"></div></div></div>
+  <div class="card section"><h2>Bid register</h2><div id="bidList" class="scroll"></div></div>
+</section>
+
+<!-- TEAM -->
+<section class="tab" id="team"><div class="eyebrow">Collaboration</div><h1>Team &amp; messages</h1><p class="small" id="teamIntro"></p>
+  <div class="two"><div class="card"><h2>Project team</h2><div id="memberList"></div>
+    <div id="inviteBox" class="mt"><h3>Invite a contractor, architect or co-owner</h3><div class="two"><label>Email<input id="invEmail" type="email" placeholder="name@company.com"/></label><label>Role<select id="invRole"><option value="contractor">Contractor (view, bid, tasks, messages)</option><option value="editor">Editor (architect / co-owner)</option><option value="viewer">Viewer (read-only)</option></select></label></div><button class="btn" id="sendInvite">Send invitation</button><p class="small" id="inviteResult"></p></div></div>
+  <div class="card"><h2>Tasks</h2><div class="flex"><input id="taskTitle" placeholder="New task (e.g. Upload boundary survey)" class="grow"/><select id="taskAssignee"></select><input id="taskDue" type="date"/><button class="btn" id="addTask">Add</button></div><div id="taskList" class="mt"></div></div></div>
+  <div class="two section"><div class="card"><h2>Project messages</h2><div id="thread" class="thread"></div><div class="flex mt"><textarea id="msgText" rows="2" class="grow" placeholder="Write a message to the project team…"></textarea><button class="btn" id="sendMsg">Send</button></div></div>
+  <div class="card"><h2>Recent activity</h2><div id="activity"></div></div></div>
+</section>
+
+<!-- FILES -->
+<section class="tab" id="files"><div class="eyebrow">Secure project storage</div><h1>Files &amp; renders</h1><p class="small">Photos, plans, surveys and AI renders stored with this project and visible to your team.</p>
+  <div class="flex"><select id="fileFilter"><option value="">All files</option><option value="render">AI renders</option><option value="photo">Photos</option><option value="plan">Plans</option><option value="survey">Surveys</option><option value="document">Documents</option></select><button class="btn secondary" data-go="property">Upload files</button></div>
+  <div id="fileGrid" class="filegrid section"></div>
+</section>
+
+<!-- BILLING -->
+<section class="tab" id="billing"><div class="eyebrow">Plans, billing &amp; AI credits</div><h1>Plans &amp; billing</h1>
+  <div class="grid" id="billingKpis"></div>
+  <div class="section"><h2>Plans</h2><div class="grid plans" id="planCards"></div></div>
+  <div class="section"><h2>AI credit packs</h2><p class="small" id="creditExplainer"></p><div class="grid" id="packCards"></div></div>
+  <div class="flex section"><button class="btn secondary" id="openPortal">Manage subscription, invoices &amp; payment methods</button></div>
+  <div class="two section"><div class="card"><h2>Payments</h2><div id="payHistory" class="scroll"></div></div><div class="card"><h2>Credit ledger</h2><div id="creditHistory" class="scroll"></div></div></div>
+  <p class="small">Payments are processed securely by Stripe. IntelliBuild never sees or stores your card details.</p>
+</section>
+
+<!-- ACCOUNT -->
+<section class="tab" id="account"><div class="eyebrow">Account</div><h1>Your account</h1>
+  <div class="two"><div class="card"><h2>Profile</h2><form id="profileForm"><label>Name<input name="name"/></label><label>Company<input name="company"/></label><label>Phone<input name="phone"/></label><label>Role<select name="accountType"><option value="homeowner">Homeowner</option><option value="contractor">Contractor / builder</option><option value="architect">Architect / designer</option><option value="developer">Developer / investor</option></select></label><button class="btn">Save profile</button></form></div>
+  <div class="card"><h2>Security</h2><p id="verifyLine" class="small"></p><form id="passwordForm"><label>Current password<input type="password" name="currentPassword" autocomplete="current-password"/></label><label>New password<input type="password" name="newPassword" minlength="8" autocomplete="new-password"/></label><button class="btn">Change password</button></form><button class="btn secondary mt" id="logoutBtn">Sign out</button></div></div>
+</section>
+
+<!-- ADMIN -->
+<section class="tab" id="admin"><div class="eyebrow">Administrator</div><h1>Admin console</h1>
+  <div class="seg" id="adminTabs"><button data-a="overview" class="on">Revenue &amp; costs</button><button data-a="users">Users</button><button data-a="settings">Pricing &amp; AI settings</button><button data-a="demo">Demo</button><button data-a="audit">Audit &amp; exports</button></div>
+  <div id="adminBody" class="section"></div>
+</section>
+
+<div class="foot">IntelliBuild AI™ v<span class="ver"></span> · Intellisoft Technologies Inc. · Geocoding: U.S. Census Geocoder · Map tiles © OpenStreetMap contributors · Imagery © Esri. All property, design, cost, permitting and structural decisions require independent verification.</div>
+</div></main></div>
+
+<div id="modal" class="modal hidden" role="dialog" aria-modal="true"><div class="modal-card"><h2 id="modalTitle"></h2><div id="modalBody"></div><div class="flex mt end"><button class="btn secondary" id="modalCancel">Cancel</button><button class="btn" id="modalOk">OK</button></div></div></div>
+<div id="toasts" aria-live="polite"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js?v=3.0.1"></script>
+<script src="app.js?v=3.0.1"></script>
+<script src="modules.js?v=3.0.1"></script>
+</body></html>
