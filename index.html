@@ -4,7 +4,7 @@
 <meta name="description" content="IntelliBuild AI: property intelligence, AI replacement-home concepts, smart takeoffs, cost estimating and contractor bidding in one workspace."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"/>
-<link href="app.css?v=3.2.9" rel="stylesheet"/>
+<link href="app.css?v=3.3.0" rel="stylesheet"/>
 </head><body>
 <div id="boot" class="boot">Intelli<span>Build</span> AI™</div>
 
@@ -149,7 +149,12 @@
     <label>Lot size (sq ft)<input type="number" min="0" data-k="lotArea"/></label>
     <label>Parcel ID (if known)<input data-k="parcelInput" placeholder="From assessor record"/></label></div>
     <p class="small">Changes save automatically to your project.</p></div>
-  <div class="card"><h2>Photos, floor plans &amp; surveys</h2><div class="upload edit-zone"><div class="big">▧</div><p>Upload photos of the existing house, floor plans, surveys and site documents (JPG, PNG, WebP, PDF · 10 MB each).</p>
+  <div class="card"><h2>Photos, floor plans &amp; surveys</h2>
+    <div class="pubphotos"><b>Photos from public sources</b><p class="small">No camera needed — pull a current picture of the existing home and save it to the project.</p>
+      <div class="flex"><button class="btn sm edit-only" data-getphoto="aerial">📷 County aerial photo</button><button class="btn sm secondary edit-only" data-getphoto="street">🚶 Street-level photo</button>
+      <a class="link icare-link" target="_blank" rel="noopener" href="https://icare.fairfaxcounty.gov/ffxcare/Main/Home.aspx">County record &amp; sketch (iCare) ↗</a><a class="link" target="_blank" rel="noopener" href="https://www.fairfaxcounty.gov/geoapps/Jade/">Bird's-eye views (Jade) ↗</a></div>
+      <p class="small">Aerial: Fairfax County 3-inch orthophotography (Esri imagery outside Fairfax). Street-level: Mapillary, CC BY-SA. Assessor photos and sketches open on iCare.</p></div>
+    <div class="upload edit-zone"><div class="big">▧</div><p>Upload photos of the existing house, floor plans, surveys and site documents (JPG, PNG, WebP, PDF · 10 MB each).</p>
     <select id="uploadKind" class="inline"><option value="photo">Photo</option><option value="plan">Floor plan</option><option value="survey">Survey</option><option value="document">Other document</option></select>
     <input type="file" id="uploads" multiple accept="image/png,image/jpeg,image/webp,application/pdf"/></div>
     <p class="small" id="uploadStatus"></p><div class="thumbs" id="thumbs"></div></div></div>
@@ -176,7 +181,9 @@
 
 <!-- AI VISUAL -->
 <section class="tab" id="visualai"><div class="eyebrow">AI Visual Studio · paid credits</div><h1>AI Replacement-Home Concepts</h1><p>Upload a photo of the existing home and generate photorealistic <b>conceptual</b> replacement-home images. Renders are saved to the project and shared with your team. Output is an artistic visualization, not a buildable drawing.</p>
-  <div class="two"><div class="card"><h2>1 · Existing home</h2><div class="upload"><input id="aiPhoto" type="file" accept="image/png,image/jpeg,image/webp"/><p class="small">JPG / PNG / WebP. Resized in your browser before upload.</p></div><img id="aiOriginal" alt="Existing home" class="hidden preview"/>
+  <div class="two"><div class="card"><h2>1 · Existing home</h2><div class="upload"><input id="aiPhoto" type="file" accept="image/png,image/jpeg,image/webp"/><p class="small">JPG / PNG / WebP. Resized in your browser before upload.</p>
+    <div class="flex center"><button class="btn sm secondary edit-only" data-aiget="street">🚶 Find a street-level photo</button><button class="btn sm secondary edit-only" data-aiget="aerial">📷 Use county aerial photo</button></div></div>
+    <div id="aiPhotoPick"></div><img id="aiOriginal" alt="Existing home" class="hidden preview"/>
     <h2 class="mt">2 · Brief</h2>
     <label>Architecture<select data-k="aiStyle"><option value="modern farmhouse">Modern farmhouse</option><option value="contemporary">Contemporary</option><option value="craftsman">Craftsman</option><option value="traditional colonial">Traditional colonial</option><option value="transitional">Transitional</option><option value="mid-century modern">Mid-century modern</option><option value="mediterranean">Mediterranean</option></select></label>
     <label>Finish tier<select data-k="aiFinish"><option>Standard</option><option>Premium</option><option>Luxury</option></select></label>
@@ -214,6 +221,10 @@
 <!-- DESIGN -->
 <section class="tab" id="design"><div class="eyebrow">Step 02 · Imagine</div><h1>Design Studio</h1><p>Choose an architectural direction and specify the new home. Area changes flow through the budget, takeoffs and scenarios.</p>
   <div class="designs" id="designCards"></div>
+  <div class="section card" id="inspoCard"><div class="flex between"><h2>Real homes · <span id="inspoStyle">Modern Farmhouse</span></h2><button class="btn sm secondary" id="inspoMore">More photos</button></div>
+    <p class="small">Photographs of real, built homes in the selected style, to share with your architect and builders. Save favourites to the project or add them to your AI brief. Each photo shows its author and licence; open it for the full credit.</p>
+    <div class="inspo" id="inspoGrid"></div>
+    <p class="small mt">Photos: Wikimedia Commons and Openverse contributors, used under the licences shown. IntelliBuild does not claim ownership; homes shown are examples, not designs for sale.</p></div>
   <div class="section card"><h2>New home requirements</h2><div class="two">
     <label>Target floor area <b id="areaLabel"></b><input type="range" min="1200" max="10000" step="100" data-k="area"/></label>
     <label>Stories<select data-k="stories"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
@@ -318,10 +329,11 @@
   <button class="btn sm secondary" id="logCopy">Copy</button><button class="btn sm secondary" id="logDl">Download</button><button class="btn sm secondary" id="logClear">Clear</button></div>
   <div id="logList"></div></aside>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js?v=3.2.9"></script>
-<script src="app.js?v=3.2.9"></script>
-<script src="pricing.js?v=3.2.9"></script>
-<script src="modules.js?v=3.2.9"></script>
-<script src="journey.js?v=3.2.9"></script>
-<script src="features.js?v=3.2.9"></script>
+<script src="config.js?v=3.3.0"></script>
+<script src="app.js?v=3.3.0"></script>
+<script src="pricing.js?v=3.3.0"></script>
+<script src="modules.js?v=3.3.0"></script>
+<script src="journey.js?v=3.3.0"></script>
+<script src="photos.js?v=3.3.0"></script>
+<script src="features.js?v=3.3.0"></script>
 </body></html>

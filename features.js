@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.9 — Materials & Labor price book, Permits/Safety/Quality, Plans & Documents, key tests */
+/* IntelliBuild AI™ v3.3.0 — Materials & Labor price book, Permits/Safety/Quality, Plans & Documents, key tests */
 'use strict';
 
 /* ================================================================== price book */
@@ -309,9 +309,9 @@ async function adminPricebook() {
   $('cbReset').onclick = async () => { if (!(await modal('Restore default price book?', '<p>Your edits to prices, wages and productivity are replaced with the built-in November 2026 Northern Virginia values.</p>', 'Restore'))) return; try { await api('admin.settingsSave', { settings: { costbook: d.defaults.costbook } }); S.plansCfg = await api('billing.plans'); toast('Defaults restored.'); adminPricebook(); } catch (e) { fail(e); } };
 }
 const KEY_FIELDS = [['GEMINI_API_KEY', 'Google Gemini API key', 'AIza… from aistudio.google.com/apikey', true], ['OPENAI_API_KEY', 'OpenAI API key (optional alternative)', 'sk-…', true],
-  ['STRIPE_SECRET_KEY', 'Stripe secret key', 'sk_test_… or sk_live_…', true], ['STRIPE_WEBHOOK_KEY', 'Webhook path secret (optional)', 'any long random string', false], ['SITE_URL', 'Public app URL', 'https://build.intellisoft-tech.com', false], ['ADMIN_EMAILS', 'Administrator emails', 'comma-separated', false]];
+  ['STRIPE_SECRET_KEY', 'Stripe secret key', 'sk_test_… or sk_live_…', true], ['STRIPE_WEBHOOK_KEY', 'Webhook path secret (optional)', 'any long random string', false], ['MAPILLARY_TOKEN', 'Mapillary client token (optional — street-level photos of the existing home)', 'MLY|… from mapillary.com/dashboard/developers', true], ['SITE_URL', 'Public app URL', 'https://build.intellisoft-tech.com', false], ['ADMIN_EMAILS', 'Administrator emails', 'comma-separated', false]];
 function renderKeyPanel(k) {
-  const secret = n => ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_KEY'].includes(n);
+  const secret = n => ['GEMINI_API_KEY', 'OPENAI_API_KEY', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_KEY', 'MAPILLARY_TOKEN'].includes(n);
   $('keyFields').innerHTML = `<p class="small">Active AI provider: ${k.activeAiProvider ? `<span class="badge ok">${esc(k.activeAiProvider)}</span>` : '<span class="badge bad">none — add a Gemini or OpenAI key</span>'}</p>` + KEY_FIELDS.map(([n, l, ph, testable]) => `<div class="keyrow">
     <div class="keyhead"><b>${l}</b>${secret(n) ? (k[n] ? `<span class="badge ok">✓ Set ${esc(k[n])}</span>` : '<span class="badge bad">Not set</span>') : ''}</div>
     <div class="flex"><input class="grow" type="${secret(n) ? 'password' : 'text'}" data-key="${n}" autocomplete="off" placeholder="${secret(n) && k[n] ? 'Saved — paste a new value to replace' : esc(ph)}" ${secret(n) ? '' : `value="${esc(k[n] || '')}"`}/>${testable ? `<button class="btn sm secondary" data-ktest="${n}" ${k[n] ? '' : 'disabled'}>Test</button>` : ''}</div>
@@ -347,4 +347,4 @@ $('logClear').onclick = () => { IBLOG.items = []; IBLOG.unseenErr = 0; try { loc
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('logDrawer').classList.contains('open')) openLog(false); });
 ibLog('info', 'app', 'IntelliBuild v' + VERSION + ' loaded');
 
-wire(); renderStatic(); boot();
+wire(); wirePhotos(); renderStatic(); boot();

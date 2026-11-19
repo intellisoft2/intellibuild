@@ -1,4 +1,4 @@
-/* IntelliBuild AI™ v3.2.9 — guided project journey, Autopilot, and the narrated demo tour */
+/* IntelliBuild AI™ v3.3.0 — guided project journey, Autopilot, and the narrated demo tour */
 'use strict';
 
 /* ================================================================== journey */
@@ -83,12 +83,12 @@ async function autopilot() {
   if (!S.canEdit || !S.pid) return;
   let addr = S.P.matched || S.P.address;
   if (!addr && !S.P.sample) { const v = await modal('Autopilot', '<p>Enter the property address and IntelliBuild will set up the rest of the project for you.</p><label>Street address, city, state ZIP<input name="a" placeholder="e.g. 3615 Chain Bridge Rd, Fairfax, VA 22030"/></label>', 'Start Autopilot'); if (!v || !v.a.trim()) return; addr = v.a.trim(); S.P.address = addr; }
-  const steps = [['locate', 'Locate the property'], ['map', 'Map nearby structures'], ['records', 'Pull official county records'], ['program', 'Suggest the new-home program'], ['price', 'Price materials & labor'], ['brief', 'Write the architect brief'], ['schedule', 'Schedule permits & inspections'], ['plan', 'Draw & save the concept floor plan']];
+  const steps = [['locate', 'Locate the property'], ['map', 'Map nearby structures'], ['records', 'Pull official county records'], ['photo', 'Get a photo of the existing home'], ['program', 'Suggest the new-home program'], ['price', 'Price materials & labor'], ['brief', 'Write the architect brief'], ['schedule', 'Schedule permits & inspections'], ['plan', 'Draw & save the concept floor plan']];
   const ov = document.createElement('div'); ov.className = 'modal'; ov.innerHTML = `<div class="modal-card ap"><h2>✨ Autopilot</h2><p class="small">Doing the busywork so you don't have to. You can change anything afterwards.</p><ol class="ap-steps">${steps.map(s => `<li id="ap_${s[0]}"><span class="ap-ico">○</span><span>${s[1]}</span><span class="small ap-note"></span></li>`).join('')}</ol><div class="flex end mt"><button class="btn hidden" id="apDone">See my next step →</button></div></div>`;
   document.body.append(ov);
   const mark = (id, state, note) => { const li = $('ap_' + id); li.className = state; li.querySelector('.ap-ico').textContent = { run: '◌', ok: '✓', skip: '–', err: '!' }[state]; li.querySelector('.ap-note').textContent = note || ''; };
   ibLog('info', 'autopilot', 'Autopilot started for ' + (addr || 'sample property'));
-  const LIMIT = { locate: 20000, map: 12000, records: 45000, plan: 25000 };
+  const LIMIT = { locate: 20000, map: 12000, records: 45000, photo: 30000, plan: 25000 };
   const run = async (id, fn) => { mark(id, 'run'); const label = (steps.find(x => x[0] === id) || [, id])[1];
     const cap = LIMIT[id] || 15000; let timer;
     const timeout = new Promise(res => { timer = setTimeout(() => res({ skip: 1, timedOut: 1, note: 'Taking too long — skipped so Autopilot can continue; you can retry it later' }), cap); });
@@ -115,6 +115,14 @@ async function autopilot() {
     if (!premium()) return { skip: 1, note: 'Pro feature — unlock to auto-pull official records' };
     await lookupCounty(); if (!S.P.county) return { skip: 1, note: $('recordStatus').textContent.slice(0, 90) };
     const r = { conflicts: (S.P.countyConflicts || []) }; return { note: 'PIN ' + S.P.county.pin + (r.conflicts.length ? ' · ' + r.conflicts.length + ' differ from your entries — review on County Records' : ' · fields filled') };
+  });
+  await run('photo', async () => {
+    if (S.P.sample) return { skip: 1, note: 'Sample property' };
+    if (S.P.lat == null) return { skip: 1, note: 'Locate the property first' };
+    if (S.files.some(f => f.kind === 'photo')) return { skip: 1, note: 'Photo already on file' };
+    const r = await api('property.photo', { projectId: S.pid, lat: S.P.lat, lon: S.P.lon, kind: 'aerial' }, 'Fetching the county aerial photo…', { timeoutMs: 25000 });
+    S.fileCache[r.file.id] = Promise.resolve('data:' + r.mime + ';base64,' + r.b64); S.files.unshift(r.file); if (typeof renderThumbs === 'function') renderThumbs();
+    return { note: r.meta.source };
   });
   await run('program', async () => { if (suggestProgram(S.P)) return { note: S.P.area.toLocaleString() + ' sq ft · ' + S.P.newBeds + ' bed · ' + S.P.newBaths + ' bath' }; return { skip: 1, note: S.P.designTouched ? 'Kept your design choices' : 'Add existing-home size for a suggestion' }; });
   await run('price', async () => { const cb = costbook(); if (!cb) return { skip: 1 }; const e = IBPricing.estimate(S.P, cb); S.P.rate = Math.round(e.totals.contract / Number(S.P.area) / 5) * 5; compute(); return { note: fmt(e.totals.contract) + ' expected contract · ' + fmt(e.totals.low) + '–' + fmt(e.totals.high) + ' bid range' }; });

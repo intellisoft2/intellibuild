@@ -1,6 +1,6 @@
-/* IntelliBuild AI™ Enterprise — web client v3.2.9 (c) Intellisoft Technologies Inc. */
+/* IntelliBuild AI™ Enterprise — web client v3.3.0 (c) Intellisoft Technologies Inc. */
 'use strict';
-const VERSION = '3.2.9';
+const VERSION = '3.3.0';
 const CFG = window.INTELLIBUILD_CONFIG || {};
 const $ = id => document.getElementById(id);
 const qa = (s, r = document) => [...r.querySelectorAll(s)];
@@ -455,7 +455,7 @@ function fileSrc(id) {
 function hydrateImages(root) { qa('img[data-fid]', root).forEach(img => fileSrc(img.dataset.fid).then(src => { img.src = src; }).catch(() => { img.alt = 'Unavailable'; })); }
 function renderThumbs() {
   const list = S.files.filter(f => f.kind !== 'render').slice(0, 24);
-  $('thumbs').innerHTML = list.map(f => `<figure>${/^image/.test(f.mime) ? `<img data-fid="${f.id}" alt="${esc(f.name)}"/>` : '<div class="doc">📄</div>'}<figcaption title="${esc(f.name)}">${esc(f.kind)} · ${esc(f.name)}</figcaption></figure>`).join('') || '<p class="small">No files uploaded yet.</p>';
+  $('thumbs').innerHTML = list.map(f => `<figure>${/^image/.test(f.mime) ? `<img data-fid="${f.id}" alt="${esc(f.name)}"/>` : '<div class="doc">📄</div>'}<figcaption title="${esc(f.name + (f.meta && f.meta.attribution ? ' — ' + f.meta.attribution : ''))}">${esc(f.kind)} · ${esc(f.meta && f.meta.source ? f.meta.source : f.name)}</figcaption></figure>`).join('') || '<p class="small">No files uploaded yet.</p>';
   hydrateImages($('thumbs'));
 }
 async function uploadFiles(files) {
